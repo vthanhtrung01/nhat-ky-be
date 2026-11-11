@@ -1,0 +1,253 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Đăng nhập Google hoặc link email (cả hai đều đã xác minh email).
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function familyPath(fid) {
+      return /databases/$(database)/documents/families/$(fid);
+    }
+
+    function memberPath(fid, uid) {
+      return /databases/$(database)/documents/families/$(fid)/members/$(uid);
+    }
+
+    function isMember(fid) {
+      return signedIn() && exists(memberPath(fid, request.auth.uid));
+    }
+
+    function isOwner(fid) {
+      return signedIn() && get(memberPath(fid, request.auth.uid)).data.role == 'owner';
+    }
+
+    // Sau lần ghi này mình là chủ (dùng khi tạo nhật ký: family, chủ và hồ sơ bé trong cùng một batch).
+    function ownerAfter(fid) {
+      return signedIn() && getAfter(memberPath(fid, request.auth.uid)).data.role == 'owner';
+    }
+
+    function validRelation(r) {
+      return r in ['ba', 'me', 'ong', 'grandma', 'baomau', 'khac'];
+    }
+
+    function validName(n) {
+      return n is string && n.size() >= 1 && n.size() <= 40;
+    }
+
+    // Người ghi: uid của một thành viên (có thể là người đã rời nhật ký).
+    function validBy(v) {
+      return v is string && v.size() >= 1 && v.size() <= 128;
+    }
+
+    function optEmail(e) {
+      return e == null || (e is string && e.size() <= 254);
+    }
+
+    // Tìm các nhật ký của mình: collection group query trên members theo uid.
+    match /{path=**}/members/{memberId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /families/{fid} {
+      function validCode(c) {
+        return c is string && c.matches('^[0-9a-f]{32}$');
+      }
+
+      // Không ai liệt kê được danh sách nhật ký.
+      allow get: if isMember(fid);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['inviteCode', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasAll(['inviteCode', 'createdAt', 'createdBy'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt is timestamp
+        && validCode(request.resource.data.inviteCode)
+        && ownerAfter(fid);
+      // Chủ chỉ đổi được mã mời (link cũ hết hiệu lực).
+      allow update: if isOwner(fid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['inviteCode'])
+        && validCode(request.resource.data.inviteCode);
+      allow delete: if isOwner(fid);
+
+      // Thành viên: role owner (chủ) hoặc member.
+      match /members/{memberId} {
+        function validMember(d) {
+          return d.keys().hasOnly(['uid', 'role', 'relation', 'name', 'email', 'joinedAt'])
+            && d.keys().hasAll(['uid', 'role', 'relation', 'name', 'email', 'joinedAt'])
+            && d.uid == memberId
+            && d.role in ['owner', 'member']
+            && validRelation(d.relation)
+            && validName(d.name)
+            && optEmail(d.email)
+            && d.joinedAt is timestamp;
+        }
+
+        allow get: if isMember(fid) || (signedIn() && memberId == request.auth.uid);
+        allow list: if isMember(fid);
+        allow create: if signedIn() && validMember(request.resource.data) && (
+          // Chủ đầu tiên, tạo cùng batch với family mới.
+          (memberId == request.auth.uid
+            && request.resource.data.role == 'owner'
+            && !exists(familyPath(fid))
+            && getAfter(familyPath(fid)).data.createdBy == request.auth.uid)
+          // Chủ duyệt người đã gửi yêu cầu tham gia.
+          || (isOwner(fid)
+            && request.resource.data.role == 'member'
+            && exists(/databases/$(database)/documents/families/$(fid)/requests/$(memberId))));
+        // Chủ sửa được mọi người (kể cả quyền chủ); thành viên chỉ sửa quan hệ và tên của mình.
+        allow update: if validMember(request.resource.data)
+          && request.resource.data.joinedAt == resource.data.joinedAt
+          && (isOwner(fid)
+            || (memberId == request.auth.uid && isMember(fid) && request.resource.data.role == resource.data.role));
+        // Chủ xóa người khác; ai cũng tự rời được.
+        allow delete: if isOwner(fid) || (signedIn() && memberId == request.auth.uid);
+      }
+
+      // Yêu cầu tham gia: phải có đúng mã mời hiện tại, email phải là email đăng nhập.
+      match /requests/{uid} {
+        function validRequest(d) {
+          return d.keys().hasOnly(['uid', 'inviteCode', 'relation', 'name', 'email', 'at'])
+            && d.keys().hasAll(['uid', 'inviteCode', 'relation', 'name', 'email', 'at'])
+            && d.uid == uid
+            && d.inviteCode == get(familyPath(fid)).data.inviteCode
+            && validRelation(d.relation)
+            && validName(d.name)
+            && d.email == request.auth.token.email
+            && d.at is timestamp;
+        }
+
+        allow get: if isOwner(fid) || (signedIn() && uid == request.auth.uid);
+        allow list: if isOwner(fid);
+        allow create, update: if signedIn()
+          && uid == request.auth.uid
+          && !exists(memberPath(fid, uid))
+          && validRequest(request.resource.data);
+        allow delete: if isOwner(fid) || (signedIn() && uid == request.auth.uid);
+      }
+
+      match /events/{eventId} {
+        function validEvent() {
+          let d = request.resource.data;
+          // d3 (vitamin D3 pha vào sữa) là trường tùy chọn, chỉ được true ở cữ bú.
+          // milk (loại sữa) là trường tùy chọn, chỉ có giá trị ở cữ bú. Thiếu thì coi là sữa công thức.
+          // burp (ợ hơi), spit (trớ), after (trạng thái sau bú) là trường tùy chọn, chỉ có giá trị ở cữ bú.
+          // endAt (giờ thức dậy) chỉ có ở giấc ngủ; null nghĩa là bé đang ngủ.
+          return d.keys().hasOnly(['type', 'at', 'ml', 'diaper', 'by', 'd3', 'milk', 'endAt', 'burp', 'spit', 'after'])
+            && d.keys().hasAll(['type', 'at', 'ml', 'diaper', 'by'])
+            && (!('d3' in d) || (d.d3 is bool && (d.type == 'feed' || d.d3 == false)))
+            && (!('milk' in d) || d.milk == null || (d.type == 'feed' && d.milk in ['formula', 'breast']))
+            && (!('burp' in d) || d.burp == null || (d.type == 'feed' && d.burp in ['yes', 'no']))
+            && (!('spit' in d) || d.spit == null || (d.type == 'feed' && d.spit in ['none', 'little', 'lot']))
+            && (!('after' in d) || d.after == null || (d.type == 'feed' && d.after in ['asleep', 'calm', 'fussy']))
+            && (!('endAt' in d) || d.endAt == null || (d.type == 'sleep' && d.endAt is timestamp && d.endAt >= d.at))
+            && d.at is timestamp
+            && validBy(d.by)
+            && ((d.type in ['feed', 'pump'] && d.diaper == null
+                  && (d.ml == null || (d.ml is int && d.ml >= 1 && d.ml <= 500)))
+              || (d.type == 'diaper' && d.ml == null && d.diaper in ['dry', 'wet'])
+              || (d.type == 'sleep' && d.ml == null && d.diaper == null));
+        }
+
+        allow read, delete: if isMember(fid);
+        allow create, update: if isMember(fid) && validEvent();
+      }
+
+      // Việc cần làm dùng chung: ai thêm (by), ai tick xong (doneBy) và lúc nào (doneAt).
+      match /todos/{todoId} {
+        function validTodo() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['text', 'done', 'createdAt', 'by', 'doneAt', 'doneBy'])
+            && d.keys().hasAll(['text', 'done', 'createdAt', 'by', 'doneAt', 'doneBy'])
+            && d.text is string && d.text.size() >= 1 && d.text.size() <= 200
+            && d.done is bool
+            && d.createdAt is timestamp
+            && validBy(d.by)
+            && ((d.done == false && d.doneAt == null && d.doneBy == null)
+              || (d.done == true && d.doneAt is timestamp && validBy(d.doneBy)));
+        }
+
+        allow read, delete: if isMember(fid);
+        allow create, update: if isMember(fid) && validTodo();
+      }
+
+      // Hồ sơ bé, chỉ có một tài liệu 'baby'. Cân nặng tính bằng kg.
+      // Chủ sửa mọi trường; thành viên chỉ sửa cân nặng.
+      match /profile/{docId} {
+        function validProfile() {
+          let d = request.resource.data;
+          return docId == 'baby'
+            && d.keys().hasOnly(['name', 'birthAt', 'sex', 'weightKg', 'updatedAt', 'by'])
+            && d.keys().hasAll(['name', 'birthAt', 'sex', 'updatedAt', 'by'])
+            && validName(d.name)
+            && d.birthAt is timestamp
+            && d.sex in ['f', 'm']
+            && (!('weightKg' in d) || d.weightKg == null || (d.weightKg is number && d.weightKg >= 1.5 && d.weightKg <= 10))
+            && d.updatedAt is timestamp
+            && validBy(d.by);
+        }
+
+        allow read: if isMember(fid);
+        allow create: if validProfile() && ownerAfter(fid);
+        allow update: if isMember(fid) && validProfile()
+          && (isOwner(fid) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['weightKg', 'updatedAt', 'by']));
+        allow delete: if isOwner(fid);
+      }
+
+      // Mỗi lần cân đo: cân nặng (kg) và chiều dài (cm), cần ít nhất một chỉ số.
+      match /measurements/{measurementId} {
+        function validMeasurement() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['at', 'weightKg', 'lengthCm', 'by'])
+            && d.keys().hasAll(['at', 'weightKg', 'lengthCm', 'by'])
+            && d.at is timestamp
+            && validBy(d.by)
+            && (d.weightKg == null || (d.weightKg is number && d.weightKg >= 1.5 && d.weightKg <= 20))
+            && (d.lengthCm == null || (d.lengthCm is number && d.lengthCm >= 40 && d.lengthCm <= 100))
+            && (d.weightKg != null || d.lengthCm != null);
+        }
+
+        allow read, delete: if isMember(fid);
+        allow create, update: if isMember(fid) && validMeasurement();
+      }
+
+      // Mũi tiêm đã tiêm hoặc bỏ qua. Mũi tự thêm có name và dueAt, chưa tiêm thì status và at là null.
+      match /vaccines/{vaccineId} {
+        function validVaccine() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['status', 'at', 'by', 'note', 'name', 'dueAt'])
+            && d.keys().hasAll(['status', 'at', 'by', 'note'])
+            && validBy(d.by)
+            && (d.note == null || (d.note is string && d.note.size() <= 200))
+            && (!('name' in d) || (d.name is string && d.name.size() >= 1 && d.name.size() <= 100 && d.dueAt is timestamp))
+            && ((d.status in ['done', 'skipped'] && d.at is timestamp)
+              || (d.status == null && d.at == null && 'name' in d));
+        }
+
+        allow read, delete: if isMember(fid);
+        allow create, update: if isMember(fid) && validVaccine();
+      }
+
+      // Lịch tái khám. timeSet = false thì at là 12h trưa ngày hẹn, chỉ hiện ngày.
+      match /appointments/{appointmentId} {
+        function optText(v, max) {
+          return v == null || (v is string && v.size() <= max);
+        }
+
+        function validAppointment() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['at', 'timeSet', 'place', 'doctor', 'reason', 'note', 'done', 'doneAt', 'by'])
+            && d.keys().hasAll(['at', 'timeSet', 'place', 'doctor', 'reason', 'note', 'done', 'doneAt', 'by'])
+            && d.at is timestamp
+            && d.timeSet is bool
+            && optText(d.place, 100) && optText(d.doctor, 200) && optText(d.reason, 200) && optText(d.note, 200)
+            && validBy(d.by)
+            && ((d.done == false && d.doneAt == null)
+              || (d.done == true && d.doneAt is timestamp));
+        }
+
+        allow read, delete: if isMember(fid);
+        allow create, update: if isMember(fid) && validAppointment();
+      }
+    }
+  }
+}
