@@ -19,6 +19,8 @@
       "tests-rules/**",
       "scripts/**",
       "**/.*",
+      ".git/**",
+      ".firebase/**",
       "*.log",
       "**/node_modules/**"
     ],
