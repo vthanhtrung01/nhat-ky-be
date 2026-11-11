@@ -83,6 +83,9 @@ export function createDemoBackend() {
     updateAppointment: appointments.update,
     removeAppointment: appointments.remove,
     subscribeFamily: (onData) => watch(() => onData(read('family', null))),
+    subscribeBackground: (onData) => watch(() => onData(read('background', null))),
+    setBackground: (fields) => write('background', fields),
+    removeBackground: () => write('background', null),
     subscribeMembers: (onData) => watch(() => onData(members.all())),
     listMembers: async () => members.all(),
     subscribeRequests: (onData) => watch(() => onData([])),
@@ -92,7 +95,7 @@ export function createDemoBackend() {
     removeMember: async (uid) => members.remove(uid),
     rotateInvite: async (inviteCode) => write('family', { ...read('family', {}), inviteCode }),
     async deleteFamily() {
-      for (const name of ['events', 'todos', 'measurements', 'vaccines', 'appointments', 'members', 'profile', 'family']) {
+      for (const name of ['events', 'todos', 'measurements', 'vaccines', 'appointments', 'members', 'profile', 'background', 'family']) {
         localStorage.removeItem(PREFIX + name);
       }
       notify();

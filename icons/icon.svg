@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Icon app: cuốn sổ có tim. Nền tràn viền, hình nằm trong vùng an toàn của icon maskable. -->
+  <rect width="512" height="512" fill="#FFE3EE"/>
+  <g transform="translate(88 88) scale(14)" fill="none" stroke="#C2255C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M9 3v18 M14 15l-2.4-2.4a1.6 1.6 0 0 1 2.4-2.1 1.6 1.6 0 0 1 2.4 2.1z"/>
+  </g>
+</svg>

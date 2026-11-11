@@ -12,6 +12,10 @@ import {
   PLACE_MAX, TEXT_MAX, appointmentStatus, daysUntil, nextAppointment, splitAppointments,
 } from './appointments.js';
 import { canListen, listen } from './voice.js';
+import { icon } from './icons.js';
+import {
+  ALPHA_MAX, ALPHA_MIN, applyBackground, imageToDataUrl, saveAlpha, savedAlpha, validImage,
+} from './background.js';
 import {
   NAME_MAX, RELATIONS, SEX, cleanName, inviteUrl, isLastOwner, memberLabel, parseBirth, parseInvite, randomHex,
 } from './members.js';
@@ -56,6 +60,7 @@ const state = {
   vaccines: [],
   showAllVaccines: false,
   appointments: [],
+  background: null,
 };
 
 function get(key) {
@@ -113,15 +118,15 @@ const mlPerKg = () => mlPerKgOf(state.profile);
 const isOwner = () => state.members.some((m) => m.uid === state.uid && m.role === 'owner');
 
 function babyLine() {
-  return h('p', { class: 'age' }, `👶 ${babyName()} ${ageLabel(ageInDays(birthAt(), Date.now()))}`);
+  return h('p', { class: 'age' }, icon('baby'), `${babyName()} ${ageLabel(ageInDays(birthAt(), Date.now()))}`);
 }
 
 function eventIcon(e) {
-  if (e.type === 'feed') return milkOf(e) === 'breast' ? '🤱' : '🍼';
-  if (e.type === 'pump') return '🥛';
-  if (e.type === 'sleep') return '😴';
+  if (e.type === 'feed') return milkOf(e) === 'breast' ? icon('breast', 'ev-breast') : icon('bottle', 'ev-feed');
+  if (e.type === 'pump') return icon('pump', 'ev-pump');
+  if (e.type === 'sleep') return icon('moon', 'ev-sleep');
   // Giá trị 'dry' trong dữ liệu nghĩa là tã ị (giữ tên cũ để không phải chuyển dữ liệu).
-  return e.diaper === 'dry' ? '💩' : '💧';
+  return e.diaper === 'dry' ? icon('poop', 'ev-diaper') : icon('drop', 'ev-diaper');
 }
 
 function eventTitle(e) {
@@ -174,7 +179,7 @@ function renderBanners() {
 // ---------- Ô ngày dd/mm/yyyy ----------
 
 // Ô date của trình duyệt hiện theo ngôn ngữ máy (máy tiếng Anh ra tháng trước ngày), nên app dùng
-// ô chữ dd/mm/yyyy, kèm nút 📅 là ô date gốc trong suốt phủ lên để mở lịch của máy.
+// ô chữ dd/mm/yyyy, kèm nút lịch là ô date gốc trong suốt phủ lên để mở lịch của máy.
 // .value đọc/ghi dạng yyyy-mm-dd như ô date gốc ('' nếu trống hoặc sai).
 function dateField({ value = '', min, max, required = false, id, label = 'Ngày', onchange } = {}) {
   const native = h('input', { type: 'date', class: 'date-native', tabIndex: -1, 'aria-hidden': 'true' });
@@ -215,7 +220,7 @@ function dateField({ value = '', min, max, required = false, id, label = 'Ngày'
     text.setCustomValidity('');
     emit();
   });
-  wrap = h('span', { class: 'date-field' }, text, h('span', { class: 'date-btn', 'aria-hidden': 'true' }, '📅', native));
+  wrap = h('span', { class: 'date-field' }, text, h('span', { class: 'date-btn', 'aria-hidden': 'true' }, icon('calendar'), native));
   Object.defineProperty(wrap, 'value', {
     get: () => vnDateToIso(text.value) ?? '',
     set: (v) => {
@@ -327,7 +332,7 @@ function openMlSheet(id, milk, woke) {
   // Chỉ hỏi D3 khi hôm nay chưa có cữ nào pha D3 (không tính cữ vừa ghi).
   const d3 = milk.feed ? vitaminD3Status(state.recent.filter((e) => e.id !== id), Date.now()) : null;
   let d3On = false;
-  const d3Label = () => (d3On ? '✓ Đã pha D3 vào cữ này' : '💊 Có pha D3 vào cữ này?');
+  const d3Label = () => (d3On ? ['✓ Đã pha D3 vào cữ này'] : [icon('pill'), 'Có pha D3 vào cữ này?']);
   const d3Btn = d3 && !d3.given ? h('button', {
     class: `btn block d3-toggle${d3.missed ? '' : ' due'}`,
     type: 'button',
@@ -336,7 +341,7 @@ function openMlSheet(id, milk, woke) {
       d3On = !d3On;
       state.store.update(id, { d3: d3On });
       d3Btn.setAttribute('aria-pressed', String(d3On));
-      d3Btn.textContent = d3Label();
+      d3Btn.replaceChildren(...d3Label());
     },
   }, d3Label()) : null;
   const saveMl = (ml) => {
@@ -484,7 +489,7 @@ function statsCards(s) {
       h('div', { class: 'name' }, 'Tổng sữa'),
       h('div', { class: 'value' }, `${s.totalMl} `, h('small', {}, 'ml')),
       h('div', { class: 'sub' }, `${s.feeds} cữ${s.missingMl ? `, ${s.missingMl} chưa nhập ml` : ''}${s.feeds ? (s.d3 ? ', D3 ✓' : ', chưa D3') : ''}`),
-      s.feeds ? h('div', { class: 'sub' }, `🍼 công thức ${s.formulaMl} ml (${s.formulaFeeds} cữ), 🤱 mẹ ${s.breastMl} ml (${s.breastFeeds} cữ)`) : null),
+      s.feeds ? h('div', { class: 'sub' }, icon('bottle'), `công thức ${s.formulaMl} ml (${s.formulaFeeds} cữ), `, icon('breast'), `mẹ ${s.breastMl} ml (${s.breastFeeds} cữ)`) : null),
     h('div', { class: 'card stat' },
       h('div', { class: 'name' }, 'Thay tã'),
       h('div', { class: 'value' }, `${s.diapers} `, h('small', {}, 'lần')),
@@ -504,9 +509,9 @@ function timeline(events) {
   return h('ul', { class: 'timeline' }, events.map((e) => h('li', {},
     h('button', { type: 'button', onclick: () => openEditor(e), 'aria-label': `${eventTitle(e)} lúc ${fmtTime(e.at)}, bởi ${who(e.by)}. Chạm để sửa` },
       h('span', { class: 't' }, fmtTime(e.at)),
-      h('span', {}, eventIcon(e)),
+      h('span', { class: 'ev-ico' }, eventIcon(e)),
       h('span', {}, eventTitle(e), ' ',
-        e.d3 ? h('span', { class: 'tag d3' }, '💊 D3') : null, ' ',
+        e.d3 ? h('span', { class: 'tag d3' }, icon('pill'), 'D3') : null, ' ',
         (e.type === 'feed' || e.type === 'pump') && e.ml == null ? h('span', { class: 'tag' }, 'chưa nhập ml') : null,
         e.type === 'feed' ? AFTER_FEED.map(({ key }) => (AFTER_TAG[key][e[key]]
           ? [' ', h('span', { class: `tag after ${key}-${e[key]}` }, AFTER_TAG[key][e[key]])] : null)) : null),
@@ -524,7 +529,7 @@ function d3Card() {
   const s = vitaminD3Status(state.recent, Date.now());
   if (s.given) {
     return h('section', { class: 'card d3-card done' },
-      h('div', { class: 'label' }, '💊 Vitamin D3 hôm nay'),
+      h('div', { class: 'label' }, icon('pill'), 'Vitamin D3 hôm nay'),
       h('p', {}, `Đã pha vào cữ ${fmtTime(s.feed.at)}${who(s.feed.by) ? `, ${who(s.feed.by)}` : ''} ✓`));
   }
   const message = s.due === 'first' ? 'Nhớ pha D3 vào cữ bú đầu tiên'
@@ -532,7 +537,7 @@ function d3Card() {
       : 'Chưa cho D3 hôm nay';
   const last = s.feeds.at(-1);
   return h('section', { class: `card d3-card${s.missed ? ' late' : ''}` },
-    h('div', { class: 'label' }, '💊 Vitamin D3 hôm nay'),
+    h('div', { class: 'label' }, icon('pill'), 'Vitamin D3 hôm nay'),
     h('p', {}, message),
     last ? h('button', { class: 'btn block', type: 'button', onclick: () => markD3(last) }, `Đã pha D3 vào cữ ${fmtTime(last.at)}`) : null);
 }
@@ -581,9 +586,9 @@ function sleepButton() {
   const sleep = currentSleep(state.recent, Date.now());
   return sleep
     ? h('button', { class: 'action sleep awake', type: 'button', onclick: logWake },
-      h('span', { class: 'ico', 'aria-hidden': 'true' }, '☀️'), `Thức dậy (đã ngủ ${fmtMinutes(Date.now() - sleep.at)})`)
+      icon('sun', 'ico'), `Thức dậy (đã ngủ ${fmtMinutes(Date.now() - sleep.at)})`)
     : h('button', { class: 'action sleep', type: 'button', onclick: logSleep },
-      h('span', { class: 'ico', 'aria-hidden': 'true' }, '😴'), 'Ngủ');
+      icon('moon', 'ico'), 'Ngủ');
 }
 
 function renderToday() {
@@ -599,11 +604,11 @@ function renderToday() {
     appointmentCard(),
     vaccineCard(),
     h('div', { class: 'actions' },
-      h('button', { class: 'action feed', type: 'button', onclick: () => logFeed('formula') }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '🍼'), 'Sữa công thức'),
-      h('button', { class: 'action feed breast', type: 'button', onclick: () => logFeed('breast') }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '🤱'), 'Sữa mẹ'),
-      h('button', { class: 'action pump', type: 'button', onclick: logPump }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '🥛'), 'Hút sữa'),
-      h('button', { class: 'action diaper', type: 'button', onclick: () => logDiaper('dry') }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '💩'), 'Tã ị'),
-      h('button', { class: 'action diaper', type: 'button', onclick: () => logDiaper('wet') }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '💧'), 'Tã ướt'),
+      h('button', { class: 'action feed', type: 'button', onclick: () => logFeed('formula') }, icon('bottle', 'ico'), 'Sữa công thức'),
+      h('button', { class: 'action feed breast', type: 'button', onclick: () => logFeed('breast') }, icon('breast', 'ico'), 'Sữa mẹ'),
+      h('button', { class: 'action pump', type: 'button', onclick: logPump }, icon('pump', 'ico'), 'Hút sữa'),
+      h('button', { class: 'action diaper', type: 'button', onclick: () => logDiaper('dry') }, icon('poop', 'ico'), 'Tã ị'),
+      h('button', { class: 'action diaper', type: 'button', onclick: () => logDiaper('wet') }, icon('drop', 'ico'), 'Tã ướt'),
       sleepButton()),
     h('h2', {}, 'Thống kê hôm nay'),
     statsCards(dayStats(state.recent, today)),
@@ -807,7 +812,7 @@ function renderTodos() {
     'aria-label': 'Nói để thêm việc',
     'aria-pressed': 'false',
     onclick: () => toggleListening(input, mic),
-  }, '🎤') : null;
+  }, icon('mic')) : null;
   show(
     h('h1', {}, 'Việc cần làm'),
     h('form', {
@@ -818,7 +823,7 @@ function renderTodos() {
         else toast('Nhập nội dung việc');
       },
     }, input, mic, h('button', { class: 'btn primary', type: 'submit' }, 'Thêm')),
-    mic ? h('p', { class: 'muted small' }, 'Bấm 🎤 rồi nói, ví dụ "mua tã size M". Nói xong việc sẽ tự được thêm.') : null,
+    mic ? h('p', { class: 'muted small' }, 'Bấm ', icon('mic'), 'rồi nói, ví dụ "mua tã size M". Nói xong việc sẽ tự được thêm.') : null,
     h('div', { id: 'todo-list', class: 'mt' }),
   );
   renderTodoList();
@@ -973,7 +978,7 @@ function openMlPerKgEditor() {
 
 function mlPerKgRow() {
   return h('div', { class: 'row-btns mt' },
-    h('span', {}, `🍼 Sữa mục tiêu: ${mlPerKg()} ml/kg/ngày`),
+    h('span', {}, icon('bottle'), `Sữa mục tiêu: ${mlPerKg()} ml/kg/ngày`),
     h('button', { class: 'btn', type: 'button', onclick: openMlPerKgEditor }, '✎ Sửa'));
 }
 
@@ -1172,7 +1177,7 @@ function growthSection() {
   const list = [...data].sort((a, b) => b.at - a.at);
 
   return h('div', { id: 'growth' },
-    h('h2', {}, '📏 Tăng trưởng'),
+    h('h2', {}, icon('ruler'), 'Tăng trưởng'),
     summary ? h('p', { class: 'growth-summary' }, summary, h('small', {}, `Lần đo gần nhất ${fmtShortDay(list[0].at)}`)) : null,
     h('button', { class: 'btn primary block', type: 'button', onclick: () => openMeasurementEditor(null) }, '+ Thêm lần cân đo'),
     h('div', { class: 'mt' },
@@ -1187,7 +1192,7 @@ function growthSection() {
 }
 
 const VACCINE_ICON = {
-  done: '✅', skipped: '⏭️', notNeeded: '➖', overdue: '⚠️', due: '💉', soon: '🔔', upcoming: '⏳',
+  done: 'done', skipped: 'skip', notNeeded: 'minus', overdue: 'alert', due: 'syringe', soon: 'bell', upcoming: 'clock',
 };
 const PENDING = ['overdue', 'due', 'soon', 'upcoming'];
 
@@ -1298,7 +1303,7 @@ function openCustomVaccine() {
 function vaccineItem(v, now) {
   return h('li', { class: `vaccine ${v.status}` },
     h('button', { type: 'button', onclick: () => openVaccineEditor(v), 'aria-label': `${v.name}, ${PROGRAMS[v.program]}. ${vaccineWhen(v, now)}. Chạm để ghi` },
-      h('span', { class: 'v-ico', 'aria-hidden': 'true' }, VACCINE_ICON[v.status]),
+      h('span', { class: 'v-ico', 'aria-hidden': 'true' }, icon(VACCINE_ICON[v.status])),
       h('span', { class: 'v-text' },
         h('span', {}, v.name, ' ', h('span', { class: `tag ${v.program}` }, PROGRAMS[v.program])),
         h('small', {}, vaccineWhen(v, now)))));
@@ -1315,7 +1320,7 @@ function vaccineSection() {
   const done = plan.filter((v) => v.status === 'done').length;
 
   return h('div', { id: 'vaccines' },
-    h('h2', {}, '💉 Tiêm chủng'),
+    h('h2', {}, icon('syringe'), 'Tiêm chủng'),
     h('p', { class: 'muted small' }, `Đã tiêm ${done} mũi. Lịch tham khảo, hãy theo chỉ định của bác sĩ và điểm tiêm. Mũi TCMR và mũi dịch vụ cùng mốc thay thế nhau, ghi một bên thì bên kia tự thành "không cần".`),
     shown.length
       ? shown.map((g) => h('section', { class: 'card vaccine-group' },
@@ -1340,7 +1345,7 @@ function vaccineCard() {
   if (!list.length) return null;
   const late = list.some((v) => v.status === 'overdue');
   return h('section', { class: `card vaccine-card${late ? ' late' : ''}` },
-    h('div', { class: 'label' }, '💉 Tiêm chủng'),
+    h('div', { class: 'label' }, icon('syringe'), 'Tiêm chủng'),
     h('ul', {}, list.slice(0, 3).map((v) => h('li', {}, h('b', {}, v.name), h('small', {}, vaccineWhen(v, now))))),
     h('button', {
       class: 'btn block',
@@ -1450,19 +1455,19 @@ function appointmentItem(a, now) {
   const detail = appointmentDetail(a);
   return h('li', { class: `appt ${status}` },
     h('button', { type: 'button', onclick: () => openAppointmentEditor(a), 'aria-label': `${a.reason ?? 'Tái khám'}, ${appointmentWhen(a, now)}${detail ? `, ${detail}` : ''}. Chạm để sửa` },
-      h('span', { class: 'v-ico', 'aria-hidden': 'true' }, a.done ? '✅' : status === 'past' ? '⚠️' : '🩺'),
+      h('span', { class: 'v-ico', 'aria-hidden': 'true' }, icon(a.done ? 'done' : status === 'past' ? 'alert' : 'stetho')),
       h('span', { class: 'v-text' },
         h('span', {}, a.reason ?? 'Tái khám'),
         h('small', { class: 'when' }, appointmentWhen(a, now)),
         detail ? h('small', {}, detail) : null,
-        a.note ? h('small', {}, `📝 ${a.note}`) : null)));
+        a.note ? h('small', {}, icon('note'), a.note) : null)));
 }
 
 function appointmentSection() {
   const now = Date.now();
   const { open, done } = splitAppointments(state.appointments);
   return h('div', { id: 'appointments' },
-    h('h2', {}, '🩺 Tái khám'),
+    h('h2', {}, icon('stetho'), 'Tái khám'),
     h('button', { class: 'btn primary block', type: 'button', onclick: () => openAppointmentEditor(null) }, '+ Thêm lịch tái khám'),
     h('div', { class: 'card mt' }, open.length
       ? h('ul', { class: 'vaccine-list' }, open.map((a) => appointmentItem(a, now)))
@@ -1479,12 +1484,12 @@ function appointmentCard() {
   const detail = appointmentDetail(a);
   const cls = a.status === 'past' ? ' late' : a.status === 'upcoming' ? '' : ' due';
   return h('section', { class: `card appt-card${cls}` },
-    h('div', { class: 'label' }, a.status === 'past' ? '⚠️ Lịch tái khám đã qua' : '🩺 Lịch tái khám sắp tới'),
+    h('div', { class: 'label' }, a.status === 'past' ? [icon('alert'), 'Lịch tái khám đã qua'] : [icon('stetho'), 'Lịch tái khám sắp tới']),
     h('ul', {}, h('li', {},
       h('b', {}, a.reason ?? 'Tái khám'),
       h('small', { class: 'when' }, appointmentWhen(a, now)),
       detail ? h('small', {}, detail) : null,
-      a.note ? h('small', {}, `📝 ${a.note}`) : null)),
+      a.note ? h('small', {}, icon('note'), a.note) : null)),
     h('div', { class: 'row-btns' },
       a.status === 'past' || a.status === 'today'
         ? h('button', { class: 'btn', type: 'button', onclick: () => setAppointmentDone(a, true) }, '✓ Đã khám')
@@ -1716,14 +1721,14 @@ function babySettings() {
   const p = state.profile;
   if (!isOwner()) {
     return h('section', { class: 'card' },
-      h('h2', { style: 'margin-top:0' }, '👶 Hồ sơ bé'),
+      h('h2', { style: 'margin-top:0' }, icon('baby'), 'Hồ sơ bé'),
       h('p', {}, `${p.name ?? 'Bé'} · ${SEX[p.sex] ?? ''} · sinh ${p.birthAt ? fmtDay(p.birthAt) : '?'}`),
       h('p', { class: 'small muted' }, 'Chỉ chủ nhật ký sửa được tên, ngày sinh và giới tính của bé.'),
       mlPerKgRow());
   }
   const fields = profileFields(p);
   return h('section', { class: 'card' },
-    h('h2', { style: 'margin-top:0' }, '👶 Hồ sơ bé'),
+    h('h2', { style: 'margin-top:0' }, icon('baby'), 'Hồ sơ bé'),
     h('form', {
       class: 'stack',
       onsubmit: (ev) => {
@@ -1803,7 +1808,7 @@ function membersSettings() {
   const owner = isOwner();
   const sorted = [...state.members].sort((a, b) => (a.role === b.role ? (a.joinedAt ?? 0) - (b.joinedAt ?? 0) : a.role === 'owner' ? -1 : 1));
   return h('section', { class: 'card', id: 'members' },
-    h('h2', { style: 'margin-top:0' }, '👪 Thành viên'),
+    h('h2', { style: 'margin-top:0' }, icon('family'), 'Thành viên'),
     owner && state.requests.length ? h('div', { class: 'stack' },
       h('p', {}, h('b', {}, `${state.requests.length} người xin tham gia`)),
       state.requests.map((r) => h('div', { class: 'card request' },
@@ -1813,7 +1818,7 @@ function membersSettings() {
           h('button', { class: 'btn primary', type: 'button', onclick: () => act(state.store.approve(r), `Đã duyệt ${r.name ?? ''}`) }, 'Duyệt'))))) : null,
     h('ul', { class: 'timeline member-list' }, sorted.map((m) => h('li', {},
       h('button', { type: 'button', onclick: () => openMemberDialog(m) },
-        h('span', {}, m.role === 'owner' ? '⭐' : '👤'),
+        h('span', {}, icon(m.role === 'owner' ? 'star' : 'user')),
         h('span', {}, `${RELATIONS[m.relation] ?? ''}${m.name ? ` · ${m.name}` : ''}`, m.uid === state.uid ? h('small', { class: 'muted' }, ' (bạn)') : null),
         h('span', { class: 'who' }, m.role === 'owner' ? 'Chủ' : ''))))),
     h('h3', {}, 'Mời người trong nhà'),
@@ -1916,7 +1921,7 @@ async function deleteAccount() {
 function accountSettings() {
   const owner = isOwner();
   return h('section', { class: 'card' },
-    h('h2', { style: 'margin-top:0' }, '🔐 Tài khoản'),
+    h('h2', { style: 'margin-top:0' }, icon('lock'), 'Tài khoản'),
     h('p', { class: 'small' }, `Đang đăng nhập: ${state.user?.email ?? ''}`),
     h('div', { class: 'stack' },
       h('button', { class: 'btn block', type: 'button', onclick: () => route({ pick: true }) }, 'Đổi nhật ký / tạo nhật ký khác'),
@@ -1928,12 +1933,80 @@ function accountSettings() {
 
 function privacyNote() {
   return h('details', { class: 'card' },
-    h('summary', {}, '🛡️ Quyền riêng tư'),
+    h('summary', {}, icon('shield'), 'Quyền riêng tư'),
     h('div', { class: 'small stack tight' },
-      h('p', {}, 'App lưu: email đăng nhập, tên gọi và quan hệ với bé của từng thành viên, hồ sơ bé (tên, ngày giờ sinh, giới tính) và những gì cả nhà ghi (cữ bú, tã, giấc ngủ, cân đo, tiêm chủng, lịch khám, việc cần làm).'),
+      h('p', {}, 'App lưu: email đăng nhập, tên gọi và quan hệ với bé của từng thành viên, hồ sơ bé (tên, ngày giờ sinh, giới tính) và những gì cả nhà ghi (cữ bú, tã, giấc ngủ, cân đo, tiêm chủng, lịch khám, việc cần làm, ảnh nền nếu có chọn).'),
       h('p', {}, 'Dữ liệu nằm trên Google Firebase (Firestore, khu vực Singapore). Chỉ thành viên đã được chủ nhật ký duyệt mới đọc và ghi được. Người làm app không bán, không quảng cáo, không phân tích dữ liệu của bạn.'),
       h('p', {}, 'Bạn có thể rời nhật ký, xóa toàn bộ nhật ký (chủ) hoặc xóa tài khoản bất cứ lúc nào ở mục Tài khoản bên trên.'),
       h('p', {}, 'Biểu đồ, lịch tiêm và giờ nhắc chỉ để tham khảo, không thay cho chỉ định của bác sĩ.')));
+}
+
+// Giao diện: sáng/tối (riêng máy này) và ảnh nền chung của nhật ký.
+function appearanceSettings(currentTheme) {
+  const bg = validImage(state.background?.image) ? state.background.image : null;
+  const input = h('input', {
+    type: 'file',
+    accept: 'image/*',
+    hidden: true,
+    onchange: async (ev) => {
+      const file = ev.target.files?.[0];
+      ev.target.value = '';
+      if (!file || !state.store) return;
+      let image;
+      try {
+        image = await imageToDataUrl(file);
+      } catch {
+        toast('Không mở được ảnh này, hãy thử ảnh khác (JPG, PNG).');
+        return;
+      }
+      state.store.setBackground({ image, updatedAt: Date.now(), by: state.uid });
+      toast('Đã đổi ảnh nền cho cả nhà');
+    },
+  });
+  const alpha = savedAlpha();
+  const alphaLabel = h('span', { class: 'muted' }, `${alpha}%`);
+  return h('section', { class: 'card stack tight' },
+    h('h2', { style: 'margin-top:0' }, icon('palette'), 'Giao diện'),
+    h('label', { class: 'field' }, 'Sáng / tối',
+      h('select', {
+        onchange: (ev) => {
+          set('nkb.theme', ev.target.value);
+          applyTheme(ev.target.value);
+        },
+      }, Object.entries(THEMES).map(([v, label]) => h('option', { value: v, selected: v === currentTheme }, label)))),
+    h('div', { class: 'field' }, 'Ảnh nền',
+      bg ? h('div', { class: 'bg-preview', style: `background-image:url("${bg}")`, role: 'img', 'aria-label': 'Ảnh nền đang dùng' }) : null,
+      bg && state.background.by ? h('span', { class: 'small muted' }, `${who(state.background.by)} đặt ${fmtShortDay(state.background.updatedAt)}`) : null,
+      h('div', { class: 'row-btns' },
+        h('button', { class: 'btn', type: 'button', onclick: () => input.click() }, icon('image'), bg ? 'Đổi ảnh' : 'Chọn ảnh'),
+        bg ? h('button', {
+          class: 'btn danger',
+          type: 'button',
+          onclick: () => {
+            const prev = state.background;
+            state.store.removeBackground();
+            toast('Đã bỏ ảnh nền', () => state.store?.setBackground({ image: prev.image, updatedAt: Date.now(), by: state.uid }));
+          },
+        }, 'Bỏ ảnh nền') : null),
+      input),
+    bg ? h('label', { class: 'field' },
+      h('span', {}, 'Độ đục của thẻ ', alphaLabel),
+      h('input', {
+        type: 'range',
+        class: 'range',
+        min: ALPHA_MIN,
+        max: ALPHA_MAX,
+        step: 1,
+        value: alpha,
+        oninput: (ev) => {
+          applyBackground(bg, ev.target.value);
+          alphaLabel.textContent = `${ev.target.value}%`;
+        },
+        onchange: (ev) => saveAlpha(ev.target.value),
+      })) : null,
+    h('p', { class: 'small muted' }, bg
+      ? 'Ảnh nền dùng chung cho cả nhà. Độ đục chỉ áp dụng trên máy này: kéo sang trái để thấy ảnh rõ hơn, sang phải để chữ dễ đọc hơn.'
+      : 'Chọn một tấm ảnh trong máy làm nền cho app. Ảnh được nén lại và lưu cùng nhật ký, mọi người trong nhà đều thấy.'));
 }
 
 function renderSettings() {
@@ -1943,13 +2016,7 @@ function renderSettings() {
     h('div', { class: 'stack' },
       membersSettings(),
       babySettings(),
-      h('label', { class: 'field' }, 'Giao diện',
-        h('select', {
-          onchange: (ev) => {
-            set('nkb.theme', ev.target.value);
-            applyTheme(ev.target.value);
-          },
-        }, Object.entries(THEMES).map(([v, label]) => h('option', { value: v, selected: v === currentTheme }, label)))),
+      appearanceSettings(currentTheme),
       accountSettings(),
       privacyNote()),
   );
@@ -1958,7 +2025,7 @@ function renderSettings() {
 function requestsCard() {
   if (!isOwner() || !state.requests.length) return null;
   return h('section', { class: 'card appt-card due' },
-    h('div', { class: 'label' }, '👪 Có người xin tham gia'),
+    h('div', { class: 'label' }, icon('family'), 'Có người xin tham gia'),
     h('p', {}, state.requests.map((r) => `${RELATIONS[r.relation] ?? ''} ${r.name ?? ''}`.trim()).join(', ')),
     h('button', {
       class: 'btn block',
@@ -1974,13 +2041,13 @@ function requestsCard() {
 // ---------- Khung app ----------
 
 const TABS = [
-  ['today', '🏠', 'Hôm nay', renderToday],
-  ['history', '📖', 'Lịch sử', renderHistory],
-  ['todos', '✅', 'Việc', renderTodos],
-  ['charts', '📊', 'Biểu đồ', renderCharts],
-  ['health', '💉', 'Sức khỏe', renderHealth],
-  ['posts', '📝', 'Bài viết', renderPosts],
-  ['settings', '⚙️', 'Cài đặt', renderSettings],
+  ['today', 'home', 'Hôm nay', renderToday],
+  ['history', 'book', 'Lịch sử', renderHistory],
+  ['todos', 'check', 'Việc', renderTodos],
+  ['charts', 'chart', 'Biểu đồ', renderCharts],
+  ['health', 'heart', 'Sức khỏe', renderHealth],
+  ['posts', 'pen', 'Bài viết', renderPosts],
+  ['settings', 'sliders', 'Cài đặt', renderSettings],
 ];
 
 // Hồ sơ bé chưa có ngày sinh (nhật ký cũ hoặc tạo dở): chủ nhập, người khác chờ.
@@ -2021,7 +2088,7 @@ function render() {
   }
   const pending = isOwner() ? state.requests.length : 0;
   $tabs.hidden = false;
-  $tabs.replaceChildren(...TABS.map(([key, icon, label]) => h('button', {
+  $tabs.replaceChildren(...TABS.map(([key, ico, label]) => h('button', {
     type: 'button',
     ...(key === state.tab ? { 'aria-current': 'page' } : {}),
     onclick: () => {
@@ -2034,7 +2101,7 @@ function render() {
       window.scrollTo(0, 0);
       render();
     },
-  }, h('span', { 'aria-hidden': 'true' }, icon), key === 'settings' && pending ? `${label} (${pending})` : label)));
+  }, icon(ico), key === 'settings' && pending ? `${label} (${pending})` : label)));
   TABS.find(([key]) => key === state.tab)[3]();
 }
 
@@ -2059,13 +2126,14 @@ function onWriteError(err) {
 
 // Ngừng mọi listener của nhật ký đang mở và xóa dữ liệu khỏi bộ nhớ.
 function stopFamily() {
+  applyBackground(null);
   state.stops.forEach((stop) => stop?.());
   state.stops = [];
   state.stopHistory?.();
   state.stopHistory = null;
   Object.assign(state, {
     store: null, familyId: null, family: null, members: [], requests: [], recent: [], historyEvents: [], todos: [],
-    profile: {}, measurements: [], vaccines: [], appointments: [], post: null, syncError: false,
+    profile: {}, measurements: [], vaccines: [], appointments: [], background: null, post: null, syncError: false,
     loaded: { members: false, profile: false },
   });
 }
@@ -2135,6 +2203,11 @@ function openFamily(familyId) {
       state.appointments = list;
       renderLive();
     }), onSyncError),
+    store.subscribeBackground(live((background) => {
+      state.background = background;
+      applyBackground(background?.image);
+      if (state.tab === 'settings') render();
+    }), console.error),
     store.subscribeTodos(live((todos) => {
       state.todos = todos;
       if (state.tab === 'todos') renderTodoList();
@@ -2203,7 +2276,7 @@ function renderSignIn() {
   show(
     h('h1', {}, 'Tiny Days'),
     h('p', { class: 'muted' }, 'Ghi cữ bú, hút sữa, thay tã, giấc ngủ, cân đo và tiêm chủng của bé. Cả nhà cùng xem trên điện thoại của mình.'),
-    invited ? h('p', { class: 'card' }, '📩 Bạn được mời vào nhật ký của một bé. Đăng nhập để xin tham gia.') : null,
+    invited ? h('p', { class: 'card' }, icon('mail'), 'Bạn được mời vào nhật ký của một bé. Đăng nhập để xin tham gia.') : null,
     h('section', { class: 'card stack' },
       h('button', {
         class: 'btn primary block',
@@ -2329,7 +2402,7 @@ async function renderFamilyPicker(mine) {
       class: 'btn block',
       type: 'button',
       onclick: () => openFamily(m.familyId),
-    }, `👶 ${names[i]}${m.role === 'owner' ? ' ⭐' : ''}`))),
+    }, icon('baby'), names[i], m.role === 'owner' ? [' ', icon('star', 'owner-star')] : null))),
     h('button', { class: 'btn block mt', type: 'button', onclick: () => renderCreate(true) }, '+ Tạo nhật ký mới hoặc vào bằng link mời'),
     signOutLink(),
   );

@@ -194,6 +194,26 @@ service cloud.firestore {
         allow delete: if isOwner(fid);
       }
 
+      // Ảnh nền chung của nhật ký: một ảnh JPEG (data URL) đã nén, thành viên nào cũng đổi hoặc bỏ được.
+      // Giới hạn độ dài để vừa 1 tài liệu; chỉ nhận ký tự base64 vì app đưa chuỗi này vào CSS.
+      match /settings/{docId} {
+        function validBackground() {
+          let d = request.resource.data;
+          return docId == 'background'
+            && d.keys().hasOnly(['image', 'updatedAt', 'by'])
+            && d.keys().hasAll(['image', 'updatedAt', 'by'])
+            && d.image is string
+            && d.image.size() <= 900000
+            && d.image.matches('^data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}$')
+            && d.updatedAt is timestamp
+            && d.by == request.auth.uid;
+        }
+
+        allow read: if isMember(fid);
+        allow create, update: if isMember(fid) && validBackground();
+        allow delete: if isMember(fid);
+      }
+
       // Mỗi lần cân đo: cân nặng (kg) và chiều dài (cm), cần ít nhất một chỉ số.
       match /measurements/{measurementId} {
         function validMeasurement() {

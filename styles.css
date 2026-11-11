@@ -29,6 +29,9 @@
   --due-soft: #FFF3D6;
   --shadow: 0 1px 3px rgb(194 37 92 / 10%);
   --veil: rgb(255 246 249 / 70%);
+  --bg-veil: 0.3;
+  /* Nền thẻ: đục khi không có ảnh nền, trong một phần khi có (xem .has-bg ở cuối tệp). */
+  --glass: var(--surface);
   color-scheme: light;
 }
 
@@ -64,6 +67,7 @@
   --due-soft: #3D3118;
     --shadow: none;
     --veil: rgb(27 20 32 / 84%);
+    --bg-veil: 0.5;
     color-scheme: dark;
   }
 }
@@ -99,6 +103,7 @@
   --due-soft: #3D3118;
   --shadow: none;
   --veil: rgb(27 20 32 / 84%);
+  --bg-veil: 0.5;
   color-scheme: dark;
 }
 
@@ -133,7 +138,7 @@ button { cursor: pointer; border: 0; background: none; }
 .age { margin: -6px 0 12px; font-size: 16px; font-weight: 600; }
 
 .card {
-  background: var(--surface);
+  background: var(--glass);
   border: 1px solid var(--line);
   border-radius: 20px;
   padding: 16px;
@@ -172,7 +177,9 @@ button { cursor: pointer; border: 0; background: none; }
   transition: transform .08s;
 }
 .action:active { transform: scale(.97); }
-.action .ico { font-size: 24px; line-height: 1; }
+.action .i { width: 28px; height: 28px; margin: 0 0 4px; }
+.action.feed .i { width: 34px; height: 34px; }
+.action.sleep .i { margin: 0; }
 .action { grid-column: span 2; }
 .action.feed { grid-column: span 3; min-height: 104px; background: var(--feed); color: var(--on-feed); font-size: 22px; }
 .action.breast { background: var(--breast); color: var(--on-breast); }
@@ -270,7 +277,8 @@ button { cursor: pointer; border: 0; background: none; }
 .todo-text span { font-size: 16px; font-weight: 600; }
 .todo-text small { font-size: 13px; color: var(--muted); }
 .todo-item.done .todo-text span { text-decoration: line-through; color: var(--muted); font-weight: 500; }
-.btn.mic { flex: none; width: 52px; padding: 0; font-size: 20px; }
+.btn.mic { flex: none; width: 52px; padding: 0; }
+.btn.mic .i { width: 22px; height: 22px; margin: 0; }
 .btn.mic.listening { background: var(--late-soft); border-color: var(--late); animation: mic-pulse 1.2s ease-in-out infinite; }
 @keyframes mic-pulse { 50% { box-shadow: 0 0 0 6px var(--late-soft); } }
 @media (prefers-reduced-motion: reduce) {
@@ -283,7 +291,7 @@ button { cursor: pointer; border: 0; background: none; }
   inset: auto 0 0;
   display: flex;
   justify-content: center;
-  background: var(--surface);
+  background: var(--glass);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 5;
@@ -299,12 +307,13 @@ button { cursor: pointer; border: 0; background: none; }
   font-weight: 600;
   color: var(--muted);
 }
-#tabs button span { display: block; font-size: 20px; line-height: 1.2; }
+#tabs .i { display: block; width: 22px; height: 22px; margin: 0 auto 4px; }
 @media (max-width: 420px) {
   #tabs button { font-size: 10.5px; letter-spacing: -0.3px; }
-  #tabs button span { font-size: 19px; }
+  #tabs .i { width: 21px; height: 21px; }
 }
 #tabs button[aria-current="page"] { color: var(--ink); box-shadow: inset 0 3px 0 var(--feed); }
+#tabs button[aria-current="page"] .i { stroke-width: 2.4; }
 
 /* Biểu mẫu, nút chung */
 .btn {
@@ -545,7 +554,10 @@ th { font-weight: 600; color: var(--muted); }
   text-align: left;
 }
 .vaccine:last-child button { border-bottom: 0; }
-.v-ico { font-size: 18px; text-align: center; }
+.v-ico { display: grid; place-items: center; color: var(--muted); }
+.v-ico .i { width: 20px; height: 20px; margin: 0; }
+.vaccine.overdue .v-ico, .appt.past .v-ico { color: var(--late); }
+.vaccine.due .v-ico, .vaccine.soon .v-ico, .appt:not(.done):not(.past) .v-ico { color: var(--feed); }
 .v-text { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .v-text > span { font-weight: 600; }
 .v-text small { font-size: 13px; color: var(--muted); }
@@ -594,12 +606,77 @@ th { font-weight: 600; color: var(--muted); }
 
 /* Thành viên: biểu tượng, tên, nhãn Chủ */
 .member-list button { grid-template-columns: 28px 1fr auto; }
+.member-list .i { width: 20px; height: 20px; margin: 0; color: var(--muted); }
 .card.request { margin: 0; box-shadow: none; }
 
-/* Ô ngày dd/mm/yyyy: ô chữ + nút 📅 có ô date gốc trong suốt phủ lên để mở lịch */
+/* Ô ngày dd/mm/yyyy: ô chữ + nút lịch có ô date gốc trong suốt phủ lên để mở lịch */
 .date-field { position: relative; display: flex; gap: 8px; align-items: center; min-width: 0; }
 .date-field input[type="text"] { flex: 1; min-width: 0; }
-.date-btn { position: relative; flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 20px; }
+.date-btn { position: relative; flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+.date-btn .i { width: 22px; height: 22px; margin: 0; }
 .date-btn .date-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; padding: 0; border: 0; cursor: pointer; }
 .datetime-field { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .date-nav .date-field { flex: 1; }
+
+/* Ảnh nền riêng của máy (js/background.js). Ảnh nằm cố định sau nội dung, phủ một lớp màu nền
+   (--bg-veil) cho dịu lại; thẻ và thanh tab trong một phần, làm mờ ảnh phía sau để chữ vẫn rõ. */
+.has-bg body::before,
+.has-bg body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.has-bg body::before { background: var(--bg-image) center / cover no-repeat; }
+.has-bg body::after { background: var(--bg); opacity: var(--bg-veil); }
+@supports (background: color-mix(in srgb, red 50%, transparent)) {
+  .has-bg { --glass: color-mix(in srgb, var(--surface) var(--glass-alpha, 78%), transparent); }
+}
+.has-bg :is(.card, #tabs) {
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+/* Bài viết dài nằm ngoài thẻ: đặt vào một tấm nền kính. */
+.has-bg .article {
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+/* Chữ nằm thẳng trên ảnh (tiêu đề, tuổi bé, dòng trống): viền mờ màu nền để tách khỏi ảnh. */
+.has-bg #view :is(h1, h2, .age, .empty, .muted):not(.card *, .article *) {
+  text-shadow: 0 0 2px var(--bg), 0 0 8px var(--bg), 0 0 14px var(--bg);
+}
+
+.bg-preview {
+  height: 120px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: center / cover no-repeat;
+}
+.range { width: 100%; min-height: 32px; accent-color: var(--feed); }
+
+/* Icon SVG (js/icons.js): nét bo tròn theo màu chữ, cao bằng dòng chữ đi kèm */
+.i {
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+  vertical-align: -0.2em;
+  margin-inline-end: .35em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tag .i { margin-inline-end: .2em; }
+.owner-star { margin: 0; color: var(--diaper); }
+.ev-ico { display: grid; place-items: center; }
+.ev-ico .i { width: 22px; height: 22px; margin: 0; }
+.ev-feed { color: var(--feed); }
+.ev-breast { color: var(--breast); }
+.ev-pump { color: var(--pump); }
+.ev-sleep { color: var(--sleep); }
+.ev-diaper { color: var(--diaper); }

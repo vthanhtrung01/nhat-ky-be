@@ -1,5 +1,5 @@
 // Tăng CACHE khi đổi danh sách tệp. Tệp của app lấy từ mạng trước để luôn có bản mới.
-const CACHE = 'nkb-v1';
+const CACHE = 'nkb-v3';
 const SHELL = [
   './',
   'index.html',
@@ -15,6 +15,8 @@ const SHELL = [
   'js/appointments.js',
   'js/voice.js',
   'js/members.js',
+  'js/background.js',
+  'js/icons.js',
   'js/firebase-config.js',
   'js/vendor/marked.esm.js',
   'posts/index.json',

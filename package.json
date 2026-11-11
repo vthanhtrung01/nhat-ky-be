@@ -4,7 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "test": "node --test tests/stats.test.js tests/posts.test.js tests/todos.test.js tests/growth.test.js tests/vaccines.test.js tests/appointments.test.js tests/backup.test.js tests/members.test.js",
+    "test": "node --test tests/stats.test.js tests/posts.test.js tests/todos.test.js tests/growth.test.js tests/vaccines.test.js tests/appointments.test.js tests/backup.test.js tests/members.test.js tests/background.test.js",
     "test:rules": "npx firebase-tools emulators:exec --only firestore --project demo-nkb \"node --test tests-rules/rules.test.js\"",
     "posts": "node scripts/build-posts.js",
     "backup": "node scripts/backup.js",

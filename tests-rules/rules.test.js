@@ -154,3 +154,20 @@ test('chủ xóa cả nhật ký: dữ liệu, rồi family + mình cùng batch'
   batch.delete(doc(db, 'families', FID, 'members', 'owner'));
   await assertSucceeds(batch.commit());
 });
+
+test('ảnh nền: thành viên đổi và bỏ được, người lạ không đọc được, dữ liệu sai bị chặn', async () => {
+  await addMember('m1');
+  const db = user('m1');
+  const ref = doc(db, 'families', FID, 'settings', 'background');
+  const bg = { image: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==', updatedAt: now, by: 'm1' };
+  await assertSucceeds(setDoc(ref, bg));
+  await assertSucceeds(getDoc(doc(user('owner'), 'families', FID, 'settings', 'background')));
+  await assertFails(getDoc(doc(user('stranger'), 'families', FID, 'settings', 'background')));
+  await assertFails(setDoc(doc(user('stranger'), 'families', FID, 'settings', 'background'), { ...bg, by: 'stranger' }));
+  await assertFails(setDoc(ref, { ...bg, by: 'owner' }));
+  await assertFails(setDoc(ref, { ...bg, image: 'data:image/jpeg;base64,abc"); x:url(https://e.com/a' }));
+  await assertFails(setDoc(ref, { ...bg, image: `data:image/jpeg;base64,${'A'.repeat(900000)}` }));
+  await assertFails(setDoc(ref, { ...bg, extra: 1 }));
+  await assertFails(setDoc(doc(db, 'families', FID, 'settings', 'other'), bg));
+  await assertSucceeds(deleteDoc(ref));
+});

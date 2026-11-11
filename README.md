@@ -30,13 +30,13 @@ Mỗi nhật ký dành cho một bé. Có hai bé thì tạo hai nhật ký, đ�
 - **Biểu đồ**: tổng sữa, số lần thay tã, sữa hút được trong 7 ngày.
 - **Sức khỏe**: lịch tái khám, biểu đồ tăng trưởng so với chuẩn WHO 0–24 tháng (theo giới tính của bé), lịch tiêm tham khảo theo chương trình TCMR và vắc xin dịch vụ ở Việt Nam.
 - **Bài viết**: bài tham khảo trong thư mục [posts/](posts/).
-- **Cài đặt**: thành viên, hồ sơ bé, giao diện sáng/tối, tài khoản, quyền riêng tư.
+- **Cài đặt**: thành viên, hồ sơ bé, giao diện sáng/tối và ảnh nền (ảnh chung cho cả nhà, thành viên nào cũng đổi được; độ đục của thẻ chỉnh riêng trên từng máy), tài khoản, quyền riêng tư.
 
 Giờ nhắc cữ bú = giờ cữ trước + ml cữ trước ÷ (cân nặng × hệ số ml/kg/ngày ÷ 24 giờ). Hệ số mặc định 150, mỗi nhà sửa được trên thẻ Sữa cộng dồn hoặc Cài đặt › Hồ sơ bé (100–200); chưa có cân nặng hoặc ml thì nhắc sau 2 tiếng. Biểu đồ, lịch tiêm và giờ nhắc **chỉ để tham khảo**, hãy theo chỉ định của bác sĩ.
 
 ## Quyền riêng tư
 
-- App lưu: email đăng nhập, tên gọi và quan hệ với bé của từng thành viên, hồ sơ bé (tên, ngày giờ sinh, giới tính) và những gì cả nhà ghi.
+- App lưu: email đăng nhập, tên gọi và quan hệ với bé của từng thành viên, hồ sơ bé (tên, ngày giờ sinh, giới tính), những gì cả nhà ghi và ảnh nền nếu có chọn (ảnh được nén còn dưới 700 KB, lưu trong Firestore cùng nhật ký).
 - Dữ liệu nằm trên Google Firebase (Firestore, khu vực `asia-southeast1`). Quyền đọc/ghi được kiểm tra ở máy chủ bằng [firestore.rules](firestore.rules): chỉ thành viên đã duyệt của nhật ký đó.
 - Không quảng cáo, không bán dữ liệu, không phân tích hành vi.
 - Xóa bất cứ lúc nào: **Cài đặt › Tài khoản** có Rời nhật ký, Xóa toàn bộ nhật ký (chủ) và Xóa tài khoản.

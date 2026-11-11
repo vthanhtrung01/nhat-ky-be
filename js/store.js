@@ -16,7 +16,7 @@ const useEmulator = new URLSearchParams(location.search).has('emulator');
 // Các trường thời gian lưu dạng Timestamp trên Firestore, còn trong app là số ms.
 const TIME_FIELDS = ['at', 'endAt', 'createdAt', 'doneAt', 'updatedAt', 'dueAt', 'birthAt', 'joinedAt'];
 // Các collection dữ liệu của một nhật ký, dùng khi xóa cả nhật ký.
-const DATA_COLLECTIONS = ['events', 'todos', 'profile', 'measurements', 'vaccines', 'appointments', 'requests'];
+const DATA_COLLECTIONS = ['events', 'todos', 'profile', 'measurements', 'vaccines', 'appointments', 'settings', 'requests'];
 
 function fromDoc(snapshot) {
   const data = { id: snapshot.id, ...snapshot.data() };
@@ -164,6 +164,7 @@ export async function createBackend(onWriteError) {
       const members = sub(familyId, 'members');
       const requests = sub(familyId, 'requests');
       const family = doc(db, 'families', familyId);
+      const background = doc(db, 'families', familyId, 'settings', 'background');
       const list = (ref, onData, onError, ...q) => onSnapshot(
         q.length ? query(ref, ...q) : ref,
         (snap) => onData(snap.docs.map(fromDoc)),
@@ -211,6 +212,16 @@ export async function createBackend(onWriteError) {
           return ref.id;
         },
         removeVaccine: (id) => remove(vaccines, id),
+        // Ảnh nền chung (data URL JPEG). Chưa có thì trả về null.
+        subscribeBackground(onData, onError) {
+          return onSnapshot(background, (snap) => onData(snap.exists() ? fromDoc(snap) : null), onError);
+        },
+        setBackground(fields) {
+          setDoc(background, toDoc(fields)).catch(onWriteError);
+        },
+        removeBackground() {
+          deleteDoc(background).catch(onWriteError);
+        },
         subscribeAppointments: (onData, onError) => list(appointments, onData, onError, orderBy('at')),
         addAppointment: (fields) => add(appointments, fields),
         updateAppointment: (id, fields) => update(appointments, id, fields),
