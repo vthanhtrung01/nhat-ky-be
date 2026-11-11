@@ -304,6 +304,13 @@ export function cumulativeMl(events, start, now) {
   return { points, total };
 }
 
+// Đường mục tiêu: bắt đầu từ cữ có ml đầu tiên trong ngày (ngay sau bước nhảy) và kéo thẳng tới
+// mục tiêu lúc 24h, để chấm cữ đầu luôn nằm trên đường. Chưa có cữ nào thì đi từ 0 lúc 0h.
+export function pacePoints(points, target) {
+  const first = points.length > 3 ? points[2] : [0, 0];
+  return [first, [24, target]];
+}
+
 // Mức cao nhất của trục dọc, làm tròn theo 1/2/5 x 10^n.
 export function niceMax(value) {
   if (value <= 0) return 1;

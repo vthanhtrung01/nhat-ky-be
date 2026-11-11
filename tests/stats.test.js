@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FEED_INTERVAL_MS, PUMP_INTERVAL_MS, isoToVnDate, vnDateToIso, mlPerKgOf, parseMlPerKg, addDays, ageInDays, cumulativeMl, ageLabel, awakeSince, currentSleep, dayStats, eventsOfDay, formatDuration, milkOf, nextFeed, nextPump, niceMax,
+  FEED_INTERVAL_MS, PUMP_INTERVAL_MS, isoToVnDate, vnDateToIso, mlPerKgOf, parseMlPerKg, pacePoints, addDays, ageInDays, cumulativeMl, ageLabel, awakeSince, currentSleep, dayStats, eventsOfDay, formatDuration, milkOf, nextFeed, nextPump, niceMax,
   parseLength, parseMl, parseWeight, predictNextFeed, reminderLabel, startOfDay, toLocalInput, vitaminD3Status, weekSeries, weightedQuantile,
 } from '../js/stats.js';
 
@@ -355,4 +355,12 @@ test('hệ số ml/kg/ngày: mặc định 150, mỗi nhà tự đặt trong 100
   assert.equal(parseMlPerKg('201'), null);
   assert.equal(parseMlPerKg('abc'), null);
   assert.equal(parseMlPerKg('150.5'), null);
+});
+
+test('đường mục tiêu bắt đầu từ cữ có ml đầu tiên trong ngày', () => {
+  const start = at(0);
+  const cur = cumulativeMl([feed(at(15, 30), 80), feed(at(17), 60)], start, at(17, 30));
+  assert.deepEqual(pacePoints(cur.points, 507), [[15.5, 80], [24, 507]]);
+  const empty = cumulativeMl([], start, at(9));
+  assert.deepEqual(pacePoints(empty.points, 507), [[0, 0], [24, 507]]);
 });

@@ -1,6 +1,6 @@
 import { firebaseConfig } from './firebase-config.js';
 import {
-  FEED_INTERVAL_MS, ML_PER_KG_DEFAULT, ML_PER_KG_MAX, ML_PER_KG_MIN, mlPerKgOf, parseMlPerKg, addDays, ageInDays, ageLabel, cumulativeMl, currentSleep, dayStats, nextFeed, predictNextFeed, reminderLabel, eventsOfDay, formatDuration, milkOf, niceMax, parseLength, parseMl,
+  FEED_INTERVAL_MS, ML_PER_KG_DEFAULT, ML_PER_KG_MAX, ML_PER_KG_MIN, mlPerKgOf, parseMlPerKg, addDays, ageInDays, ageLabel, cumulativeMl, pacePoints, currentSleep, dayStats, nextFeed, predictNextFeed, reminderLabel, eventsOfDay, formatDuration, milkOf, niceMax, parseLength, parseMl,
   isoToVnDate, vnDateToIso, parseWeight, startOfDay, toDateInput, toLocalInput, vitaminD3Status, weekSeries,
 } from './stats.js';
 import {
@@ -868,7 +868,7 @@ function barChart({ title, unit, colorVar, days, valueOf, id }) {
 }
 
 // Sữa cộng dồn hôm nay theo giờ (0h–24h), so với đường mục tiêu tăng đều
-// từ 0 lúc 0h đến cân nặng × hệ số ml/kg/ngày lúc 24h.
+// từ cữ bú đầu tiên trong ngày đến cân nặng × hệ số ml/kg/ngày lúc 24h.
 function cumulativeChart(now) {
   const W = 340;
   const H = 220;
@@ -913,7 +913,7 @@ function cumulativeChart(now) {
       axis,
       nowHour < 24 ? svg('line', { class: 'c-nowline', x1: x(nowHour), x2: x(nowHour), y1: pad.t, y2: H - pad.b }) : null,
       target ? [
-        svg('path', { class: 'c-pace', d: path([[0, 0], [24, target]]) }),
+        svg('path', { class: 'c-pace', d: path(pacePoints(cur.points, target)) }),
         svg('text', { class: 'g-label', x: W - pad.r + 4, y: y(target) + 4 }, `${target}`),
       ] : null,
       svg('path', { class: 'c-today', d: path(cur.points) }),
