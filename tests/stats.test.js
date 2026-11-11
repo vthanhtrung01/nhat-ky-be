@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FEED_INTERVAL_MS, PUMP_INTERVAL_MS, addDays, ageInDays, cumulativeMl, ageLabel, awakeSince, currentSleep, dayStats, eventsOfDay, formatDuration, milkOf, nextFeed, nextPump, niceMax,
+  FEED_INTERVAL_MS, PUMP_INTERVAL_MS, isoToVnDate, vnDateToIso, addDays, ageInDays, cumulativeMl, ageLabel, awakeSince, currentSleep, dayStats, eventsOfDay, formatDuration, milkOf, nextFeed, nextPump, niceMax,
   parseLength, parseMl, parseWeight, predictNextFeed, reminderLabel, startOfDay, toLocalInput, vitaminD3Status, weekSeries, weightedQuantile,
 } from '../js/stats.js';
 
@@ -325,4 +325,17 @@ test('sữa cộng dồn 24h tính từ mốc bắt đầu, dạng bậc thang',
   });
   // Cữ hôm sau trước mốc + 24h vẫn tính; khung đã qua kéo đến hết 24 giờ.
   assert.deepEqual(cumulativeMl(events, at(3), at(12, 0, 17)).points.at(-1), [24, 190]);
+});
+
+test('ngày kiểu Việt Nam dd/mm/yyyy', () => {
+  assert.equal(isoToVnDate('2026-10-28'), '28/10/2026');
+  assert.equal(isoToVnDate(''), '');
+  assert.equal(vnDateToIso('28/10/2026'), '2026-10-28');
+  assert.equal(vnDateToIso('5/1/2027'), '2027-01-05');
+  assert.equal(vnDateToIso('05-01-2027'), '2027-01-05');
+  assert.equal(vnDateToIso('05.01.2027'), '2027-01-05');
+  assert.equal(vnDateToIso('05012027'), '2027-01-05');
+  assert.equal(vnDateToIso('31/02/2027'), null);
+  assert.equal(vnDateToIso('10/28/2026'), null);
+  assert.equal(vnDateToIso('abc'), null);
 });

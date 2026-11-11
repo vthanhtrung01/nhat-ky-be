@@ -595,3 +595,11 @@ th { font-weight: 600; color: var(--muted); }
 /* Thành viên: biểu tượng, tên, nhãn Chủ */
 .member-list button { grid-template-columns: 28px 1fr auto; }
 .card.request { margin: 0; box-shadow: none; }
+
+/* Ô ngày dd/mm/yyyy: ô chữ + nút 📅 có ô date gốc trong suốt phủ lên để mở lịch */
+.date-field { position: relative; display: flex; gap: 8px; align-items: center; min-width: 0; }
+.date-field input[type="text"] { flex: 1; min-width: 0; }
+.date-btn { position: relative; flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 20px; }
+.date-btn .date-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; padding: 0; border: 0; cursor: pointer; }
+.datetime-field { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.date-nav .date-field { flex: 1; }

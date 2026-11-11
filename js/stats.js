@@ -342,3 +342,20 @@ export function parseLength(text) {
   const n = Number(s);
   return Number.isFinite(n) && n >= 40 && n <= 100 ? Math.round(n * 10) / 10 : null;
 }
+
+// Ngày hiển thị kiểu Việt Nam dd/mm/yyyy, còn bên trong dùng yyyy-mm-dd như ô date của trình duyệt.
+export function isoToVnDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
+// Nhận d/m/yyyy, d-m-yyyy, d.m.yyyy hoặc ddmmyyyy. Ngày không tồn tại (vd. 31/02) trả null.
+export function vnDateToIso(text) {
+  const s = (text ?? '').trim();
+  const m = /^(\d{1,2})[/.\-\s](\d{1,2})[/.\-\s](\d{4})$/.exec(s) || /^(\d{2})(\d{2})(\d{4})$/.exec(s);
+  if (!m) return null;
+  const [d, mo, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(y, mo - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}

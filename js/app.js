@@ -1,7 +1,7 @@
 import { firebaseConfig } from './firebase-config.js';
 import {
   FEED_INTERVAL_MS, ML_PER_KG_DAY, addDays, ageInDays, ageLabel, cumulativeMl, currentSleep, dayStats, nextFeed, predictNextFeed, reminderLabel, eventsOfDay, formatDuration, milkOf, niceMax, parseLength, parseMl,
-  parseWeight, startOfDay, toDateInput, toLocalInput, vitaminD3Status, weekSeries,
+  isoToVnDate, vnDateToIso, parseWeight, startOfDay, toDateInput, toLocalInput, vitaminD3Status, weekSeries,
 } from './stats.js';
 import {
   CURVES, MAX_MONTHS, ageMonths, growthPoints, latestWeight, lmsAt, percentileOf, tablesFor, valueAtZ,
@@ -170,6 +170,74 @@ function renderBanners() {
   $banners.replaceChildren(...list);
 }
 
+// ---------- Ô ngày dd/mm/yyyy ----------
+
+// Ô date của trình duyệt hiện theo ngôn ngữ máy (máy tiếng Anh ra tháng trước ngày), nên app dùng
+// ô chữ dd/mm/yyyy, kèm nút 📅 là ô date gốc trong suốt phủ lên để mở lịch của máy.
+// .value đọc/ghi dạng yyyy-mm-dd như ô date gốc ('' nếu trống hoặc sai).
+function dateField({ value = '', min, max, required = false, id, label = 'Ngày', onchange } = {}) {
+  const native = h('input', { type: 'date', class: 'date-native', tabIndex: -1, 'aria-hidden': 'true' });
+  if (min) native.min = min;
+  if (max) native.max = max;
+  native.value = value;
+  const text = h('input', {
+    type: 'text', inputMode: 'numeric', autocomplete: 'off', placeholder: 'dd/mm/yyyy', maxLength: 10,
+    required, value: isoToVnDate(value), 'aria-label': label,
+  });
+  if (id) text.id = id;
+  let wrap;
+  const emit = () => onchange?.(wrap.value);
+  // Tự thêm dấu / khi gõ số.
+  text.addEventListener('input', (ev) => {
+    if (ev.inputType?.startsWith('delete') || !/^[\d/]*$/.test(text.value)) return;
+    const digits = text.value.replace(/\D/g, '').slice(0, 8);
+    text.value = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/');
+  });
+  text.addEventListener('change', () => {
+    const iso = vnDateToIso(text.value);
+    text.setCustomValidity(text.value && !iso ? 'Nhập ngày dạng dd/mm/yyyy' : '');
+    if (iso) {
+      native.value = iso;
+      text.value = isoToVnDate(iso);
+    }
+    emit();
+  });
+  native.addEventListener('click', () => {
+    try {
+      native.showPicker();
+    } catch {
+      // Trình duyệt không có showPicker: chạm vào ô date gốc vẫn mở lịch.
+    }
+  });
+  native.addEventListener('change', () => {
+    text.value = isoToVnDate(native.value);
+    text.setCustomValidity('');
+    emit();
+  });
+  wrap = h('span', { class: 'date-field' }, text, h('span', { class: 'date-btn', 'aria-hidden': 'true' }, '📅', native));
+  Object.defineProperty(wrap, 'value', {
+    get: () => vnDateToIso(text.value) ?? '',
+    set: (v) => {
+      native.value = v;
+      text.value = isoToVnDate(v);
+    },
+  });
+  wrap.focus = () => text.focus();
+  return wrap;
+}
+
+// Ngày + giờ, .value dạng yyyy-mm-ddThh:mm như ô datetime-local ('' nếu thiếu ngày).
+function dateTimeField(value = '', { max, required = false } = {}) {
+  const [d = '', t = ''] = value.split('T');
+  const date = dateField({ value: d, max: max?.split('T')[0], required });
+  const time = h('input', { type: 'time', value: t, required, 'aria-label': 'Giờ' });
+  const wrap = h('span', { class: 'datetime-field' }, date, time);
+  Object.defineProperty(wrap, 'value', {
+    get: () => (date.value ? `${date.value}T${time.value || '00:00'}` : ''),
+  });
+  return wrap;
+}
+
 // ---------- Ghi nhanh ----------
 
 // Bé bú tức là đã thức: tự ghi giờ thức dậy nếu quên bấm.
@@ -315,7 +383,7 @@ function openEditor(event) {
   const isNew = !event.id;
   const draft = { ...event };
   const nowInput = toLocalInput(Date.now());
-  const time = h('input', { type: 'datetime-local', required: true, value: toLocalInput(draft.at), max: nowInput });
+  const time = dateTimeField(toLocalInput(draft.at), { max: nowInput, required: true });
   const people = state.members.some((m) => m.uid === draft.by) || !draft.by ? state.members : [...state.members, { uid: draft.by, gone: true }];
   const whoSel = h('select', {}, people.map((m) => h('option', { value: m.uid, selected: m.uid === (draft.by ?? state.uid) }, m.gone ? 'Người đã rời nhật ký' : who(m.uid))));
   const ml = h('input', { type: 'number', inputMode: 'numeric', min: 1, max: 500, value: draft.ml ?? '', placeholder: 'Chưa nhập' });
@@ -323,7 +391,7 @@ function openEditor(event) {
   const kind = h('select', {}, [
     ['formula', 'Sữa công thức'], ['breast', 'Sữa mẹ'], ['pump', 'Hút sữa'], ['dry', 'Tã ị'], ['wet', 'Tã ướt'], ['sleep', 'Ngủ'],
   ].map(([v, label]) => h('option', { value: v, selected: v === current }, label)));
-  const endAt = h('input', { type: 'datetime-local', value: draft.endAt ? toLocalInput(draft.endAt) : '', max: nowInput });
+  const endAt = dateTimeField(draft.endAt ? toLocalInput(draft.endAt) : '', { max: nowInput });
   const endField = h('label', { class: 'field' }, 'Thức dậy lúc (để trống nếu bé đang ngủ)', endAt);
   const afterSelects = AFTER_FEED.map((g) => h('select', {},
     h('option', { value: '', selected: draft[g.key] == null }, 'Chưa ghi'),
@@ -564,15 +632,14 @@ function renderHistory() {
   const day = state.historyDay;
   const previousInput = $view.querySelector('#history-date');
   const hadFocus = previousInput && document.activeElement === previousInput;
-  const picker = h('input', {
+  const picker = dateField({
     id: 'history-date',
-    type: 'date',
     value: toDateInput(day),
     max: toDateInput(today),
-    'aria-label': 'Chọn ngày',
-    onchange: (ev) => {
-      if (!ev.target.value) return;
-      const [y, m, d] = ev.target.value.split('-').map(Number);
+    label: 'Chọn ngày',
+    onchange: (value) => {
+      if (!value) return;
+      const [y, m, d] = value.split('-').map(Number);
       setHistoryDay(Math.min(new Date(y, m - 1, d).getTime(), today));
     },
   });
@@ -912,8 +979,8 @@ function measurementLabel(m) {
 
 function openMeasurementEditor(m) {
   const isNew = !m?.id;
-  const date = h('input', {
-    type: 'date', required: true, value: toDateInput(m?.at ?? Date.now()), max: toDateInput(Date.now()), min: toDateInput(birthAt()),
+  const date = dateField({
+    required: true, value: toDateInput(m?.at ?? Date.now()), max: toDateInput(Date.now()), min: toDateInput(birthAt()),
   });
   const weight = h('input', {
     type: 'number', inputMode: 'decimal', step: 0.01, min: 1.5, max: 20, value: m?.weightKg ?? '', placeholder: 'Ví dụ 3.62',
@@ -1094,8 +1161,8 @@ function restoreVaccine(id, prev) {
 function openVaccineEditor(v) {
   const r = v.record;
   const isCustom = v.program === 'custom';
-  const date = h('input', {
-    type: 'date', required: true, max: toDateInput(Date.now()), value: toDateInput(v.status === 'done' ? r.at : Math.min(Date.now(), v.dueAt)),
+  const date = dateField({
+    required: true, max: toDateInput(Date.now()), value: toDateInput(v.status === 'done' ? r.at : Math.min(Date.now(), v.dueAt)),
   });
   const note = h('input', { type: 'text', maxLength: NOTE_MAX, value: r?.note ?? '', placeholder: 'Nơi tiêm, tên vắc xin, số lô...' });
   const base = isCustom ? { name: v.name, dueAt: v.dueAt } : {};
@@ -1147,7 +1214,7 @@ function openVaccineEditor(v) {
 
 function openCustomVaccine() {
   const name = h('input', { type: 'text', required: true, maxLength: 100, placeholder: 'Ví dụ: Cúm nhắc lại' });
-  const due = h('input', { type: 'date', required: true, value: toDateInput(Date.now()), min: toDateInput(birthAt()) });
+  const due = dateField({ required: true, value: toDateInput(Date.now()), min: toDateInput(birthAt()) });
   openDialog(
     h('h1', {}, 'Thêm mũi khác'),
     h('form', {
@@ -1256,7 +1323,7 @@ function setAppointmentDone(a, done) {
 
 function openAppointmentEditor(a) {
   const isNew = !a?.id;
-  const date = h('input', { type: 'date', required: true, value: toDateInput(a?.at ?? Date.now()), min: toDateInput(birthAt()) });
+  const date = dateField({ required: true, value: toDateInput(a?.at ?? Date.now()), min: toDateInput(birthAt()) });
   const d = a?.timeSet ? new Date(a.at) : null;
   const time = h('input', { type: 'time', value: d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : '' });
   const place = h('input', { type: 'text', maxLength: PLACE_MAX, value: a?.place ?? '', placeholder: 'Bệnh viện, phòng khám' });
@@ -1566,7 +1633,7 @@ function profileFields(p = {}) {
   const name = h('input', {
     type: 'text', required: true, maxLength: NAME_MAX, value: p.name ?? '', placeholder: 'Tên ở nhà của bé', autocomplete: 'off',
   });
-  const date = h('input', { type: 'date', required: true, value: p.birthAt ? toDateInput(p.birthAt) : '', max: toDateInput(Date.now()) });
+  const date = dateField({ required: true, value: p.birthAt ? toDateInput(p.birthAt) : '', max: toDateInput(Date.now()) });
   const bt = p.birthAt ? new Date(p.birthAt) : null;
   const time = h('input', { type: 'time', value: bt ? `${pad2(bt.getHours())}:${pad2(bt.getMinutes())}` : '' });
   const sex = h('select', { required: true },
