@@ -24,7 +24,7 @@ Mỗi nhật ký dành cho một bé. Có hai bé thì tạo hai nhật ký, đ�
 
 ## Các tab
 
-- **Hôm nay**: nút ghi nhanh (Sữa CT, Sữa mẹ, Hút sữa, Tã ị, Tã ướt, Ngủ/Thức dậy), giờ cữ tiếp theo, sữa cộng dồn so với mục tiêu theo cân nặng, nhắc vitamin D3, mũi tiêm và lịch khám sắp tới.
+- **Hôm nay**: nút ghi nhanh (Sữa công thức, Sữa mẹ, Hút sữa, Tã ị, Tã ướt, Ngủ/Thức dậy), giờ cữ tiếp theo, sữa cộng dồn so với mục tiêu theo cân nặng, nhắc vitamin D3, mũi tiêm và lịch khám sắp tới.
 - **Lịch sử**: xem, sửa, thêm mục theo từng ngày.
 - **Việc**: danh sách việc dùng chung, thêm bằng giọng nói (🎤) nếu trình duyệt hỗ trợ.
 - **Biểu đồ**: tổng sữa, số lần thay tã, sữa hút được trong 7 ngày.

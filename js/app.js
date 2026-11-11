@@ -91,7 +91,7 @@ const fmtDay = (ms) => new Date(ms).toLocaleDateString('vi-VN', { weekday: 'long
 const fmtShortDay = (ms) => new Date(ms).toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' });
 const fmtWeekday = (ms) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][new Date(ms).getDay()];
 
-const MILK_LABEL = { formula: 'Sữa CT', breast: 'Sữa mẹ' };
+const MILK_LABEL = { formula: 'Sữa công thức', breast: 'Sữa mẹ' };
 const fmtMinutes = (ms) => formatDuration(Math.max(0, Math.round(ms / 60000)));
 
 // Thông tin sau cữ bú: giúp biết bé quấy vì đầy hơi, trớ hay vì lý do khác.
@@ -484,7 +484,7 @@ function statsCards(s) {
       h('div', { class: 'name' }, 'Tổng sữa'),
       h('div', { class: 'value' }, `${s.totalMl} `, h('small', {}, 'ml')),
       h('div', { class: 'sub' }, `${s.feeds} cữ${s.missingMl ? `, ${s.missingMl} chưa nhập ml` : ''}${s.feeds ? (s.d3 ? ', D3 ✓' : ', chưa D3') : ''}`),
-      s.feeds ? h('div', { class: 'sub' }, `🍼 CT ${s.formulaMl} ml (${s.formulaFeeds} cữ), 🤱 mẹ ${s.breastMl} ml (${s.breastFeeds} cữ)`) : null),
+      s.feeds ? h('div', { class: 'sub' }, `🍼 công thức ${s.formulaMl} ml (${s.formulaFeeds} cữ), 🤱 mẹ ${s.breastMl} ml (${s.breastFeeds} cữ)`) : null),
     h('div', { class: 'card stat' },
       h('div', { class: 'name' }, 'Thay tã'),
       h('div', { class: 'value' }, `${s.diapers} `, h('small', {}, 'lần')),
@@ -561,7 +561,7 @@ function reminderCard() {
     return h('section', { class: 'card reminder' },
       h('div', { class: 'label' }, 'Cữ tiếp theo'),
       h('p', { class: 'left' }, 'Chưa có cữ bú nào gần đây'),
-      h('div', { class: 'last' }, 'Chạm "Sữa CT" hoặc "Sữa mẹ" để bắt đầu nhắc giờ.'));
+      h('div', { class: 'last' }, 'Chạm "Sữa công thức" hoặc "Sữa mẹ" để bắt đầu nhắc giờ.'));
   }
   const { last } = next;
   const lastAmount = last.ml == null ? 'chưa nhập ml' : `${last.ml} ml`;
@@ -599,7 +599,7 @@ function renderToday() {
     appointmentCard(),
     vaccineCard(),
     h('div', { class: 'actions' },
-      h('button', { class: 'action feed', type: 'button', onclick: () => logFeed('formula') }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '🍼'), 'Sữa CT'),
+      h('button', { class: 'action feed', type: 'button', onclick: () => logFeed('formula') }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '🍼'), 'Sữa công thức'),
       h('button', { class: 'action feed breast', type: 'button', onclick: () => logFeed('breast') }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '🤱'), 'Sữa mẹ'),
       h('button', { class: 'action pump', type: 'button', onclick: logPump }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '🥛'), 'Hút sữa'),
       h('button', { class: 'action diaper', type: 'button', onclick: () => logDiaper('dry') }, h('span', { class: 'ico', 'aria-hidden': 'true' }, '💩'), 'Tã ị'),
@@ -975,7 +975,7 @@ function renderCharts() {
     h('details', { class: 'card' },
       h('summary', {}, 'Xem dạng bảng'),
       h('table', {},
-        h('thead', {}, h('tr', {}, ['Ngày', 'Bú ml', 'CT ml', 'Mẹ ml', 'Cữ', 'D3', 'Hút ml', 'Tã', 'Ị', 'Ướt'].map((t) => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, ['Ngày', 'Bú ml', 'Công thức ml', 'Mẹ ml', 'Cữ', 'D3', 'Hút ml', 'Tã', 'Ị', 'Ướt'].map((t) => h('th', {}, t)))),
         h('tbody', {}, [...days].reverse().map((d) => h('tr', {},
           h('td', {}, d.isToday ? 'Hôm nay' : `${fmtWeekday(d.day)} ${fmtShortDay(d.day)}`),
           [d.totalMl, d.formulaMl, d.breastMl, d.feeds, d.d3 ? '✓' : '–', d.pumpedMl, d.diapers, d.dry, d.wet].map((v) => h('td', {}, `${v}`))))))),
