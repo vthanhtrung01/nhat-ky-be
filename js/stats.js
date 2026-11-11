@@ -304,15 +304,15 @@ export function cumulativeMl(events, start, now) {
   return { points, total };
 }
 
-// Giờ bắt đầu trục thời gian (T0) của biểu đồ sữa cộng dồn. Đường mục tiêu đi thẳng từ (T0, 0)
-// tới (24h, mục tiêu); chọn T0 sao cho cữ có ml đầu tiên trong ngày (giờ t1, sau cữ là m1 ml)
-// nằm đúng trên đường: m1 = mục tiêu × (t1 − T0) / (24 − T0).
-// Chưa có cữ, chưa có mục tiêu, hoặc cữ đầu đã đủ mục tiêu thì trục bắt đầu lúc 0h.
+// Giờ bắt đầu trục thời gian (T0) của biểu đồ sữa cộng dồn. Trục luôn dài 24 tiếng, từ T0 đến T0 + 24h;
+// đường mục tiêu đi thẳng từ (T0, 0) tới (T0 + 24h, mục tiêu). Chọn T0 sao cho cữ có ml đầu tiên
+// trong ngày (giờ t1, sau cữ là m1 ml) nằm đúng trên đường: m1 = mục tiêu × (t1 − T0) / 24.
+// T0 có thể âm (rơi vào đêm hôm trước). Chưa có cữ, chưa có mục tiêu, hoặc cữ đầu đã đủ mục tiêu thì T0 = 0h.
 export function axisStart(points, target) {
   if (!target || points.length < 4) return 0;
   const [t1, m1] = points[2];
   if (m1 <= 0 || m1 >= target) return 0;
-  return (target * t1 - 24 * m1) / (target - m1);
+  return t1 - (24 * m1) / target;
 }
 
 // Mức cao nhất của trục dọc, làm tròn theo 1/2/5 x 10^n.

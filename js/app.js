@@ -867,8 +867,8 @@ function barChart({ title, unit, colorVar, days, valueOf, id }) {
     h('div', { class: 'x-labels', 'aria-hidden': 'true' }, days.map((d) => h('div', { class: d.isToday ? 'today' : '' }, fmtWeekday(d.day), h('br'), fmtShortDay(d.day)))));
 }
 
-// Sữa cộng dồn hôm nay theo giờ, so với đường mục tiêu tăng đều từ gốc tọa độ đến
-// cân nặng × hệ số ml/kg/ngày lúc 24h. Trục thời gian bắt đầu ở T0 (axisStart) để cữ đầu chạm đường.
+// Sữa cộng dồn theo giờ trong 24 tiếng từ T0 (axisStart), so với đường mục tiêu tăng đều từ gốc tọa độ
+// đến cân nặng × hệ số ml/kg/ngày lúc T0 + 24h. T0 chọn sao cho cữ đầu trong ngày chạm đường.
 function cumulativeChart(now) {
   const W = 340;
   const H = 220;
@@ -884,7 +884,8 @@ function cumulativeChart(now) {
   const peak = Math.max(target ?? 0, cur.total, 1);
   const step = [25, 50, 100, 150, 200, 250, 500].find((st) => Math.ceil(peak / st) <= 5) ?? niceMax(peak / 5);
   const top = Math.ceil(peak / step) * step;
-  const x = (hr) => pad.l + ((hr - t0) / (24 - t0)) * (W - pad.l - pad.r);
+  const t1 = t0 + 24;
+  const x = (hr) => pad.l + ((hr - t0) / 24) * (W - pad.l - pad.r);
   const y = (v) => H - pad.b - (v / top) * (H - pad.t - pad.b);
   const path = (pts) => pts.map(([hr, v], i) => `${i ? 'L' : 'M'}${x(hr).toFixed(1)},${y(v).toFixed(1)}`).join('');
 
@@ -895,38 +896,37 @@ function cumulativeChart(now) {
       svg('text', { class: 'g-axis', x: pad.l - 6, y: y(v) + 4, 'text-anchor': 'end' }, `${v}`),
     );
   }
-  const span = 24 - t0;
-  const hrStep = span <= 6 ? 1 : span <= 12 ? 2 : span <= 18 ? 3 : 6;
+  const hrStep = 6;
   const clock = (hr) => {
-    if (Math.round(hr * 60) === 1440) return '24h';
     const m = ((Math.round(hr * 60) % 1440) + 1440) % 1440;
     return m % 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m / 60}h`;
   };
   // Nhãn giờ bắt đầu trục, rồi các mốc tròn; bỏ mốc quá sát nhãn đầu.
   axis.push(svg('text', { class: 'g-axis', x: x(t0), y: H - 8, 'text-anchor': 'middle' }, clock(t0)));
-  for (let hr = Math.ceil(t0 / hrStep) * hrStep; hr <= 24; hr += hrStep) {
-    if (hr - t0 < hrStep * 0.6) continue;
+  for (let hr = Math.ceil(t0 / hrStep) * hrStep; hr <= t1; hr += hrStep) {
+    if (hr - t0 < hrStep * 0.6 || t1 - hr < hrStep * 0.3) continue;
     axis.push(svg('text', { class: 'g-axis', x: x(hr), y: H - 8, 'text-anchor': 'middle' }, clock(hr)));
   }
 
-  // Còn bao nhiêu ml, trong bao lâu nữa là hết ngày.
-  const leftMin = Math.round((24 - nowHour) * 60);
+  // Còn bao nhiêu ml, trong bao lâu nữa là hết 24 tiếng của trục.
+  const leftMin = Math.round((t1 - nowHour) * 60);
+  const endLabel = `${clock(t1)}${t1 > 24 ? ' mai' : ''}`;
   const leftMl = target ? target - cur.total : null;
   let summary;
   if (!target) summary = `Hôm nay ${cur.total} ml · thêm cân nặng ở mục Sức khỏe để có mục tiêu`;
   else if (leftMl <= 0) summary = `${cur.total} / ${target} ml · đã đủ mục tiêu`;
   else if (leftMin <= 0) summary = `${cur.total} / ${target} ml · thiếu ${leftMl} ml`;
-  else summary = `${cur.total} / ${target} ml · còn ${leftMl} ml trong ${formatDuration(leftMin)} (đến 24h)`;
+  else summary = `${cur.total} / ${target} ml · còn ${leftMl} ml trong ${formatDuration(leftMin)} (đến ${endLabel})`;
 
   return h('section', { class: 'card chart-card', id: 'chart-cumulative' },
     h('h2', {}, 'Sữa cộng dồn trong ngày (ml)'),
     h('div', { class: 'chart-sub' }, summary),
     svg('svg', { class: 'growth-svg', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Sữa cộng dồn: ${summary}.` },
-      nowHour < 24 ? svg('rect', { class: 'c-future', x: x(nowHour), y: pad.t, width: x(24) - x(nowHour), height: H - pad.t - pad.b }) : null,
+      nowHour < t1 ? svg('rect', { class: 'c-future', x: x(nowHour), y: pad.t, width: x(t1) - x(nowHour), height: H - pad.t - pad.b }) : null,
       axis,
-      nowHour < 24 ? svg('line', { class: 'c-nowline', x1: x(nowHour), x2: x(nowHour), y1: pad.t, y2: H - pad.b }) : null,
+      nowHour < t1 ? svg('line', { class: 'c-nowline', x1: x(nowHour), x2: x(nowHour), y1: pad.t, y2: H - pad.b }) : null,
       target ? [
-        svg('path', { class: 'c-pace', d: path([[t0, 0], [24, target]]) }),
+        svg('path', { class: 'c-pace', d: path([[t0, 0], [t1, target]]) }),
         svg('text', { class: 'g-label', x: W - pad.r + 4, y: y(target) + 4 }, `${target}`),
       ] : null,
       svg('path', { class: 'c-today', d: path(todayPts) }),

@@ -363,9 +363,11 @@ test('trục thời gian bắt đầu ở T0 để cữ đầu chạm đường 
   const start = at(0);
   const cur = cumulativeMl([feed(at(16), 80), feed(at(17), 60)], start, at(17, 30));
   const t0 = axisStart(cur.points, 507);
-  close(t0, (507 * 16 - 24 * 80) / (507 - 80));
-  // Cữ đầu (16h, 80 ml) nằm trên đường từ (T0, 0) đến (24h, 507).
-  close((507 * (16 - t0)) / (24 - t0), 80);
+  close(t0, 16 - (24 * 80) / 507);
+  // Cữ đầu (16h, 80 ml) nằm trên đường từ (T0, 0) đến (T0 + 24h, 507).
+  close((507 * (16 - t0)) / 24, 80);
+  // Cữ đầu sớm mà nhiều: T0 rơi vào đêm hôm trước.
+  close(axisStart(cumulativeMl([feed(at(1), 60)], start, at(2)).points, 480), 1 - 3);
   assert.equal(axisStart(cumulativeMl([], start, at(9)).points, 507), 0);
   assert.equal(axisStart(cur.points, null), 0);
   assert.equal(axisStart(cumulativeMl([feed(at(8), 600)], start, at(9)).points, 507), 0);
