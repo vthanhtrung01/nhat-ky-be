@@ -2077,7 +2077,7 @@ function renderSignIn() {
   const pasted = h('input', { type: 'url', placeholder: 'Dán link đăng nhập từ email', 'aria-label': 'Link đăng nhập' });
   const sent = h('p', { class: 'small', hidden: true });
   show(
-    h('h1', {}, 'Nhật ký bé'),
+    h('h1', {}, 'Tiny Days'),
     h('p', { class: 'muted' }, 'Ghi cữ bú, hút sữa, thay tã, giấc ngủ, cân đo và tiêm chủng của bé. Cả nhà cùng xem trên điện thoại của mình.'),
     invited ? h('p', { class: 'card' }, '📩 Bạn được mời vào nhật ký của một bé. Đăng nhập để xin tham gia.') : null,
     h('section', { class: 'card stack' },
@@ -2140,7 +2140,7 @@ function renderCreate(hasOthers = false) {
   const link = h('input', { type: 'url', placeholder: 'Dán link mời vào đây', 'aria-label': 'Link mời' });
   let busy = false;
   show(
-    h('h1', {}, 'Nhật ký bé'),
+    h('h1', {}, 'Tiny Days'),
     h('section', { class: 'card stack' },
       h('h2', { style: 'margin:0' }, 'Được người nhà mời?'),
       h('p', { class: 'small muted' }, 'Mở link mời họ gửi, hoặc dán vào đây.'),

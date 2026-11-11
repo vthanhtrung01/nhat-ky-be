@@ -1,4 +1,6 @@
-# Nhật ký bé
+# Tiny Days · Nhật ký bé
+
+Dùng tại **https://our-tinydays.web.app**
 
 Web app miễn phí để cả nhà cùng ghi cữ bú (sữa công thức, sữa mẹ), hút sữa, thay tã, giấc ngủ, cân đo và tiêm chủng của bé. Mỗi người dùng điện thoại của mình, dữ liệu đồng bộ ngay.
 
