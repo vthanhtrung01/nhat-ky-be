@@ -304,11 +304,15 @@ export function cumulativeMl(events, start, now) {
   return { points, total };
 }
 
-// Đường mục tiêu: bắt đầu từ cữ có ml đầu tiên trong ngày (ngay sau bước nhảy) và kéo thẳng tới
-// mục tiêu lúc 24h, để chấm cữ đầu luôn nằm trên đường. Chưa có cữ nào thì đi từ 0 lúc 0h.
-export function pacePoints(points, target) {
-  const first = points.length > 3 ? points[2] : [0, 0];
-  return [first, [24, target]];
+// Giờ bắt đầu trục thời gian (T0) của biểu đồ sữa cộng dồn. Đường mục tiêu đi thẳng từ (T0, 0)
+// tới (24h, mục tiêu); chọn T0 sao cho cữ có ml đầu tiên trong ngày (giờ t1, sau cữ là m1 ml)
+// nằm đúng trên đường: m1 = mục tiêu × (t1 − T0) / (24 − T0).
+// Chưa có cữ, chưa có mục tiêu, hoặc cữ đầu đã đủ mục tiêu thì trục bắt đầu lúc 0h.
+export function axisStart(points, target) {
+  if (!target || points.length < 4) return 0;
+  const [t1, m1] = points[2];
+  if (m1 <= 0 || m1 >= target) return 0;
+  return (target * t1 - 24 * m1) / (target - m1);
 }
 
 // Mức cao nhất của trục dọc, làm tròn theo 1/2/5 x 10^n.

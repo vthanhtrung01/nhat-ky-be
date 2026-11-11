@@ -1,6 +1,6 @@
 import { firebaseConfig } from './firebase-config.js';
 import {
-  FEED_INTERVAL_MS, ML_PER_KG_DEFAULT, ML_PER_KG_MAX, ML_PER_KG_MIN, mlPerKgOf, parseMlPerKg, addDays, ageInDays, ageLabel, cumulativeMl, pacePoints, currentSleep, dayStats, nextFeed, predictNextFeed, reminderLabel, eventsOfDay, formatDuration, milkOf, niceMax, parseLength, parseMl,
+  FEED_INTERVAL_MS, ML_PER_KG_DEFAULT, ML_PER_KG_MAX, ML_PER_KG_MIN, mlPerKgOf, parseMlPerKg, addDays, ageInDays, ageLabel, cumulativeMl, axisStart, currentSleep, dayStats, nextFeed, predictNextFeed, reminderLabel, eventsOfDay, formatDuration, milkOf, niceMax, parseLength, parseMl,
   isoToVnDate, vnDateToIso, parseWeight, startOfDay, toDateInput, toLocalInput, vitaminD3Status, weekSeries,
 } from './stats.js';
 import {
@@ -867,8 +867,8 @@ function barChart({ title, unit, colorVar, days, valueOf, id }) {
     h('div', { class: 'x-labels', 'aria-hidden': 'true' }, days.map((d) => h('div', { class: d.isToday ? 'today' : '' }, fmtWeekday(d.day), h('br'), fmtShortDay(d.day)))));
 }
 
-// Sữa cộng dồn hôm nay theo giờ (0h–24h), so với đường mục tiêu tăng đều
-// từ cữ bú đầu tiên trong ngày đến cân nặng × hệ số ml/kg/ngày lúc 24h.
+// Sữa cộng dồn hôm nay theo giờ, so với đường mục tiêu tăng đều từ gốc tọa độ đến
+// cân nặng × hệ số ml/kg/ngày lúc 24h. Trục thời gian bắt đầu ở T0 (axisStart) để cữ đầu chạm đường.
 function cumulativeChart(now) {
   const W = 340;
   const H = 220;
@@ -877,11 +877,14 @@ function cumulativeChart(now) {
   const weightKg = latestWeight(state.measurements, state.profile);
   const target = weightKg ? Math.round(weightKg * mlPerKg()) : null;
   const nowHour = cur.points.at(-1)[0];
+  const t0 = axisStart(cur.points, target);
+  // Trước T0 chưa có cữ nào, lượng sữa là 0.
+  const todayPts = [[t0, 0], ...cur.points.filter(([hr]) => hr >= t0)];
 
   const peak = Math.max(target ?? 0, cur.total, 1);
   const step = [25, 50, 100, 150, 200, 250, 500].find((st) => Math.ceil(peak / st) <= 5) ?? niceMax(peak / 5);
   const top = Math.ceil(peak / step) * step;
-  const x = (hr) => pad.l + (hr / 24) * (W - pad.l - pad.r);
+  const x = (hr) => pad.l + ((hr - t0) / (24 - t0)) * (W - pad.l - pad.r);
   const y = (v) => H - pad.b - (v / top) * (H - pad.t - pad.b);
   const path = (pts) => pts.map(([hr, v], i) => `${i ? 'L' : 'M'}${x(hr).toFixed(1)},${y(v).toFixed(1)}`).join('');
 
@@ -892,8 +895,18 @@ function cumulativeChart(now) {
       svg('text', { class: 'g-axis', x: pad.l - 6, y: y(v) + 4, 'text-anchor': 'end' }, `${v}`),
     );
   }
-  for (let hr = 0; hr <= 24; hr += 6) {
-    axis.push(svg('text', { class: 'g-axis', x: x(hr), y: H - 8, 'text-anchor': 'middle' }, `${hr}h`));
+  const span = 24 - t0;
+  const hrStep = span <= 6 ? 1 : span <= 12 ? 2 : span <= 18 ? 3 : 6;
+  const clock = (hr) => {
+    if (Math.round(hr * 60) === 1440) return '24h';
+    const m = ((Math.round(hr * 60) % 1440) + 1440) % 1440;
+    return m % 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m / 60}h`;
+  };
+  // Nhãn giờ bắt đầu trục, rồi các mốc tròn; bỏ mốc quá sát nhãn đầu.
+  axis.push(svg('text', { class: 'g-axis', x: x(t0), y: H - 8, 'text-anchor': 'middle' }, clock(t0)));
+  for (let hr = Math.ceil(t0 / hrStep) * hrStep; hr <= 24; hr += hrStep) {
+    if (hr - t0 < hrStep * 0.6) continue;
+    axis.push(svg('text', { class: 'g-axis', x: x(hr), y: H - 8, 'text-anchor': 'middle' }, clock(hr)));
   }
 
   // Còn bao nhiêu ml, trong bao lâu nữa là hết ngày.
@@ -913,10 +926,10 @@ function cumulativeChart(now) {
       axis,
       nowHour < 24 ? svg('line', { class: 'c-nowline', x1: x(nowHour), x2: x(nowHour), y1: pad.t, y2: H - pad.b }) : null,
       target ? [
-        svg('path', { class: 'c-pace', d: path(pacePoints(cur.points, target)) }),
+        svg('path', { class: 'c-pace', d: path([[t0, 0], [24, target]]) }),
         svg('text', { class: 'g-label', x: W - pad.r + 4, y: y(target) + 4 }, `${target}`),
       ] : null,
-      svg('path', { class: 'c-today', d: path(cur.points) }),
+      svg('path', { class: 'c-today', d: path(todayPts) }),
       svg('circle', { class: 'c-now', cx: x(nowHour), cy: y(cur.total), r: 4.5 })),
     h('div', { class: 'c-legend' },
       h('span', {}, h('i', { class: 'today' }), 'Đã bú'),

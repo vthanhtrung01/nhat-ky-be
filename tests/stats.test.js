@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FEED_INTERVAL_MS, PUMP_INTERVAL_MS, isoToVnDate, vnDateToIso, mlPerKgOf, parseMlPerKg, pacePoints, addDays, ageInDays, cumulativeMl, ageLabel, awakeSince, currentSleep, dayStats, eventsOfDay, formatDuration, milkOf, nextFeed, nextPump, niceMax,
+  FEED_INTERVAL_MS, PUMP_INTERVAL_MS, isoToVnDate, vnDateToIso, mlPerKgOf, parseMlPerKg, axisStart, addDays, ageInDays, cumulativeMl, ageLabel, awakeSince, currentSleep, dayStats, eventsOfDay, formatDuration, milkOf, nextFeed, nextPump, niceMax,
   parseLength, parseMl, parseWeight, predictNextFeed, reminderLabel, startOfDay, toLocalInput, vitaminD3Status, weekSeries, weightedQuantile,
 } from '../js/stats.js';
 
@@ -357,10 +357,16 @@ test('hệ số ml/kg/ngày: mặc định 150, mỗi nhà tự đặt trong 100
   assert.equal(parseMlPerKg('150.5'), null);
 });
 
-test('đường mục tiêu bắt đầu từ cữ có ml đầu tiên trong ngày', () => {
+const close = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) <= eps, `${a} ≈ ${b}`);
+
+test('trục thời gian bắt đầu ở T0 để cữ đầu chạm đường mục tiêu từ gốc tọa độ', () => {
   const start = at(0);
-  const cur = cumulativeMl([feed(at(15, 30), 80), feed(at(17), 60)], start, at(17, 30));
-  assert.deepEqual(pacePoints(cur.points, 507), [[15.5, 80], [24, 507]]);
-  const empty = cumulativeMl([], start, at(9));
-  assert.deepEqual(pacePoints(empty.points, 507), [[0, 0], [24, 507]]);
+  const cur = cumulativeMl([feed(at(16), 80), feed(at(17), 60)], start, at(17, 30));
+  const t0 = axisStart(cur.points, 507);
+  close(t0, (507 * 16 - 24 * 80) / (507 - 80));
+  // Cữ đầu (16h, 80 ml) nằm trên đường từ (T0, 0) đến (24h, 507).
+  close((507 * (16 - t0)) / (24 - t0), 80);
+  assert.equal(axisStart(cumulativeMl([], start, at(9)).points, 507), 0);
+  assert.equal(axisStart(cur.points, null), 0);
+  assert.equal(axisStart(cumulativeMl([feed(at(8), 600)], start, at(9)).points, 507), 0);
 });
