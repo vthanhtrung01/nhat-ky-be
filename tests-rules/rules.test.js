@@ -110,6 +110,9 @@ test('thành viên: không tự nâng quyền, không xóa người khác, khôn
   // Hồ sơ bé: thành viên chỉ sửa cân nặng.
   await assertSucceeds(updateDoc(doc(db, 'families', FID, 'profile', 'baby'), { weightKg: 3.6, updatedAt: now, by: 'b' }));
   await assertFails(updateDoc(doc(db, 'families', FID, 'profile', 'baby'), { name: 'Khác' }));
+  await assertSucceeds(updateDoc(doc(db, 'families', FID, 'profile', 'baby'), { mlPerKg: 160, updatedAt: now, by: 'b' }));
+  await assertFails(updateDoc(doc(db, 'families', FID, 'profile', 'baby'), { mlPerKg: 300, updatedAt: now, by: 'b' }));
+  await assertFails(updateDoc(doc(db, 'families', FID, 'profile', 'baby'), { mlPerKg: 150.5, updatedAt: now, by: 'b' }));
   // Tự rời được, rời rồi thì không đọc được nữa.
   await assertSucceeds(deleteDoc(doc(db, 'families', FID, 'members', 'b')));
   await assertFails(getDocs(collection(db, 'families', FID, 'events')));

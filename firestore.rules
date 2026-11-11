@@ -171,17 +171,18 @@ service cloud.firestore {
       }
 
       // Hồ sơ bé, chỉ có một tài liệu 'baby'. Cân nặng tính bằng kg.
-      // Chủ sửa mọi trường; thành viên chỉ sửa cân nặng.
+      // Chủ sửa mọi trường; thành viên chỉ sửa cân nặng và hệ số sữa mục tiêu (ml/kg/ngày).
       match /profile/{docId} {
         function validProfile() {
           let d = request.resource.data;
           return docId == 'baby'
-            && d.keys().hasOnly(['name', 'birthAt', 'sex', 'weightKg', 'updatedAt', 'by'])
+            && d.keys().hasOnly(['name', 'birthAt', 'sex', 'weightKg', 'mlPerKg', 'updatedAt', 'by'])
             && d.keys().hasAll(['name', 'birthAt', 'sex', 'updatedAt', 'by'])
             && validName(d.name)
             && d.birthAt is timestamp
             && d.sex in ['f', 'm']
             && (!('weightKg' in d) || d.weightKg == null || (d.weightKg is number && d.weightKg >= 1.5 && d.weightKg <= 10))
+            && (!('mlPerKg' in d) || d.mlPerKg == null || (d.mlPerKg is int && d.mlPerKg >= 100 && d.mlPerKg <= 200))
             && d.updatedAt is timestamp
             && validBy(d.by);
         }
@@ -189,7 +190,7 @@ service cloud.firestore {
         allow read: if isMember(fid);
         allow create: if validProfile() && ownerAfter(fid);
         allow update: if isMember(fid) && validProfile()
-          && (isOwner(fid) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['weightKg', 'updatedAt', 'by']));
+          && (isOwner(fid) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['weightKg', 'mlPerKg', 'updatedAt', 'by']));
         allow delete: if isOwner(fid);
       }
 

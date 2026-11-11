@@ -32,7 +32,7 @@ Mỗi nhật ký dành cho một bé. Có hai bé thì tạo hai nhật ký, đ�
 - **Bài viết**: bài tham khảo trong thư mục [posts/](posts/).
 - **Cài đặt**: thành viên, hồ sơ bé, giao diện sáng/tối, tài khoản, quyền riêng tư.
 
-Giờ nhắc cữ bú = giờ cữ trước + ml cữ trước ÷ (cân nặng × 140 ml ÷ 24 giờ); chưa có cân nặng hoặc ml thì nhắc sau 2 tiếng. Biểu đồ, lịch tiêm và giờ nhắc **chỉ để tham khảo**, hãy theo chỉ định của bác sĩ.
+Giờ nhắc cữ bú = giờ cữ trước + ml cữ trước ÷ (cân nặng × hệ số ml/kg/ngày ÷ 24 giờ). Hệ số mặc định 150, mỗi nhà sửa được trên thẻ Sữa cộng dồn hoặc Cài đặt › Hồ sơ bé (100–200); chưa có cân nặng hoặc ml thì nhắc sau 2 tiếng. Biểu đồ, lịch tiêm và giờ nhắc **chỉ để tham khảo**, hãy theo chỉ định của bác sĩ.
 
 ## Quyền riêng tư
 

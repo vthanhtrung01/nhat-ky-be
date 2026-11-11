@@ -3,11 +3,14 @@
 export const FEED_INTERVAL_MS = 2 * 60 * 60 * 1000;
 export const PUMP_INTERVAL_MS = 4 * 60 * 60 * 1000;
 // Dự đoán cữ bú: dùng 3 ngày gần nhất, gộp các cữ cách nhau dưới 30 phút thành một phiên,
-// cần ít nhất 8 khoảng cách để tin dữ liệu. Thiếu dữ liệu thì ước theo 140 ml/kg/ngày.
+// cần ít nhất 8 khoảng cách để tin dữ liệu. Thiếu dữ liệu thì ước theo cân nặng × hệ số ml/kg/ngày.
 export const PREDICT_WINDOW_MS = 72 * 60 * 60 * 1000;
 export const SESSION_GAP_MS = 30 * 60 * 1000;
 export const MIN_INTERVALS = 8;
-export const ML_PER_KG_DAY = 140;
+// Hệ số sữa mục tiêu ml/kg/ngày: mỗi nhà tự nhập (profile.mlPerKg), chưa nhập thì dùng đề xuất 150.
+export const ML_PER_KG_DEFAULT = 150;
+export const ML_PER_KG_MIN = 100;
+export const ML_PER_KG_MAX = 200;
 const HOUR_MS = 60 * 60 * 1000;
 const MAX_INTERVAL_MS = 6 * HOUR_MS;
 const PREDICT_MIN_MS = 45 * 60 * 1000;
@@ -127,15 +130,15 @@ export function awakeSince(events, now) {
   return since != null && now - since <= AWAKE_UNKNOWN_MS ? since : null;
 }
 
-// Cữ tiếp theo: khoảng cách = ml phiên bú gần nhất ÷ (cân nặng × 140 ml/kg/ngày ÷ 24 giờ),
+// Cữ tiếp theo: khoảng cách = ml phiên bú gần nhất ÷ (cân nặng × hệ số ml/kg/ngày ÷ 24 giờ),
 // tính từ lúc bắt đầu phiên. Phiên gộp các cữ cách nhau dưới 30 phút (bú mẹ rồi bú thêm CT).
 // Chưa có cân nặng hoặc phiên thiếu ml thì dùng mặc định 2 tiếng sau cữ gần nhất.
-export function nextFeed(events, now, weightKg) {
+export function nextFeed(events, now, weightKg, mlPerKg = ML_PER_KG_DEFAULT) {
   const next = nextAfter(events, 'feed', FEED_INTERVAL_MS, now);
   if (!next) return null;
   const session = mergeSessions(events.filter((e) => e.type === 'feed')).at(-1);
   if (!weightKg || session.ml == null || session.ml <= 0) return { ...next, basis: 'fixed' };
-  const perHourMl = (weightKg * ML_PER_KG_DAY) / 24;
+  const perHourMl = (weightKg * mlPerKg) / 24;
   const at = Math.round(session.at + (session.ml / perHourMl) * HOUR_MS);
   return { at, last: next.last, overdue: now >= at, remainingMs: at - now, basis: 'ml', ml: session.ml, perHourMl };
 }
@@ -185,7 +188,7 @@ function mergeSessions(feedList) {
 
 // Khoảng giờ dự kiến bé đòi bú tiếp. Ưu tiên tính theo ml cữ trước, rồi theo khoảng cách các cữ,
 // cuối cùng theo cân nặng. Trả về null khi chưa đủ dữ liệu.
-export function predictNextFeed(events, now, weightKg) {
+export function predictNextFeed(events, now, weightKg, mlPerKg = ML_PER_KG_DEFAULT) {
   const sessions = feedSessions(events, now);
   const last = sessions.at(-1);
   if (!last) return null;
@@ -219,7 +222,7 @@ export function predictNextFeed(events, now, weightKg) {
       basis = 'history';
       count = pool.length;
     } else if (weightKg && last.ml != null) {
-      const perMs = (weightKg * ML_PER_KG_DAY) / (24 * HOUR_MS);
+      const perMs = (weightKg * mlPerKg) / (24 * HOUR_MS);
       const mid = last.ml / perMs;
       range = [mid * 0.8, mid * 1.2];
       basis = 'weight';
@@ -358,4 +361,17 @@ export function vnDateToIso(text) {
   const date = new Date(y, mo - 1, d);
   if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null;
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+// Hệ số ml/kg/ngày của nhà này; thiếu hoặc ngoài 100–200 thì dùng đề xuất 150.
+export function mlPerKgOf(profile) {
+  const v = profile?.mlPerKg;
+  return Number.isInteger(v) && v >= ML_PER_KG_MIN && v <= ML_PER_KG_MAX ? v : ML_PER_KG_DEFAULT;
+}
+
+export function parseMlPerKg(text) {
+  const s = String(text ?? '').trim();
+  if (!/^\d+$/.test(s)) return null;
+  const v = Number(s);
+  return v >= ML_PER_KG_MIN && v <= ML_PER_KG_MAX ? v : null;
 }

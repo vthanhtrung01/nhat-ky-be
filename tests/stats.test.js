@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FEED_INTERVAL_MS, PUMP_INTERVAL_MS, isoToVnDate, vnDateToIso, addDays, ageInDays, cumulativeMl, ageLabel, awakeSince, currentSleep, dayStats, eventsOfDay, formatDuration, milkOf, nextFeed, nextPump, niceMax,
+  FEED_INTERVAL_MS, PUMP_INTERVAL_MS, isoToVnDate, vnDateToIso, mlPerKgOf, parseMlPerKg, addDays, ageInDays, cumulativeMl, ageLabel, awakeSince, currentSleep, dayStats, eventsOfDay, formatDuration, milkOf, nextFeed, nextPump, niceMax,
   parseLength, parseMl, parseWeight, predictNextFeed, reminderLabel, startOfDay, toLocalInput, vitaminD3Status, weekSeries, weightedQuantile,
 } from '../js/stats.js';
 
@@ -99,23 +99,23 @@ test('nhãn nhắc khi đến giờ và khi trễ', () => {
 
 test('có cân nặng: khoảng cách = ml cữ trước ÷ (cân nặng × 140 ÷ 24)', () => {
   // 3.5 kg → 490 ml/ngày; 75 ml ≈ 3h40m25s.
-  const next = nextFeed([feed(at(9), 75)], at(10), 3.5);
+  const next = nextFeed([feed(at(9), 75)], at(10), 3.5, 140);
   assert.equal(next.basis, 'ml');
   assert.equal(next.ml, 75);
   assert.equal(next.at, at(9) + Math.round((75 / (490 / 24)) * 3600000));
   assert.equal(reminderLabel(next), 'còn 2h41');
   // 4 kg → 560 ml/ngày; 70 ml đúng 3 tiếng.
-  assert.equal(nextFeed([feed(at(9), 70)], at(10), 4).at, at(12));
-  assert.equal(reminderLabel(nextFeed([feed(at(9), 70)], at(12, 15), 4)), 'Trễ 15 phút');
+  assert.equal(nextFeed([feed(at(9), 70)], at(10), 4, 140).at, at(12));
+  assert.equal(reminderLabel(nextFeed([feed(at(9), 70)], at(12, 15), 4, 140)), 'Trễ 15 phút');
 });
 
 test('cữ bú thêm dưới 30 phút được cộng ml, tính từ giờ bắt đầu', () => {
   const events = [breast(at(9), 40), feed(at(9, 20), 30)];
-  const next = nextFeed(events, at(10), 4);
+  const next = nextFeed(events, at(10), 4, 140);
   assert.equal(next.ml, 70);
   assert.equal(next.at, at(12));
   assert.equal(next.last.at, at(9, 20), 'dòng Cữ trước vẫn là cữ mới nhất');
-  const apart = nextFeed([feed(at(9), 70), feed(at(9, 30), 35)], at(10), 4);
+  const apart = nextFeed([feed(at(9), 70), feed(at(9, 30), 35)], at(10), 4, 140);
   assert.equal(apart.ml, 35, 'cách 30 phút là cữ riêng');
   assert.equal(apart.at, at(11));
 });
@@ -123,9 +123,9 @@ test('cữ bú thêm dưới 30 phút được cộng ml, tính từ giờ bắt
 test('thiếu cân nặng hoặc ml thì nhắc sau 2 tiếng', () => {
   assert.equal(nextFeed([feed(at(9), 75)], at(10)).basis, 'fixed');
   assert.equal(nextFeed([feed(at(9), 75)], at(10)).at, at(11));
-  assert.equal(nextFeed([feed(at(9), null)], at(10), 3.5).at, at(11));
-  assert.equal(nextFeed([feed(at(9), 40), breast(at(9, 10), null)], at(10), 3.5).at, at(11, 10));
-  assert.equal(nextFeed([feed(at(9), 0)], at(10), 3.5).basis, 'fixed');
+  assert.equal(nextFeed([feed(at(9), null)], at(10), 3.5, 140).at, at(11));
+  assert.equal(nextFeed([feed(at(9), 40), breast(at(9, 10), null)], at(10), 3.5, 140).at, at(11, 10));
+  assert.equal(nextFeed([feed(at(9), 0)], at(10), 3.5, 140).basis, 'fixed');
 });
 
 test('hút sữa lúc 9am thì nhắc hút tiếp lúc 1pm', () => {
@@ -233,14 +233,14 @@ test('dự đoán: chưa có cữ hoặc thiếu dữ liệu và chưa có cân 
 
 test('dự đoán theo cân nặng khi chưa đủ dữ liệu', () => {
   // 3.62 kg x 140 ml/ngày ≈ 21.1 ml/giờ, 60 ml ≈ 2h50, ±20% rồi làm tròn 5 phút.
-  const p = predictNextFeed(series(at(10), 3, 2, 60), at(10, 30), 3.62);
+  const p = predictNextFeed(series(at(10), 3, 2, 60), at(10, 30), 3.62, 140);
   assert.equal(p.basis, 'weight');
   assert.equal(p.from, at(12, 15));
   assert.equal(p.to, at(13, 25));
 });
 
 test('dự đoán theo khoảng cách khi không có ml', () => {
-  const p = predictNextFeed(series(at(12), 3, 20), at(12, 30), 3.62);
+  const p = predictNextFeed(series(at(12), 3, 20), at(12, 30), 3.62, 140);
   assert.equal(p.basis, 'history');
   assert.equal(p.from, at(15));
   assert.equal(p.to, at(15));
@@ -338,4 +338,21 @@ test('ngày kiểu Việt Nam dd/mm/yyyy', () => {
   assert.equal(vnDateToIso('31/02/2027'), null);
   assert.equal(vnDateToIso('10/28/2026'), null);
   assert.equal(vnDateToIso('abc'), null);
+});
+
+test('hệ số ml/kg/ngày: mặc định 150, mỗi nhà tự đặt trong 100–200', () => {
+  // 3.6 kg × 150 = 540 ml/ngày = 22.5 ml/giờ, 90 ml → 4 giờ.
+  assert.equal(nextFeed([feed(at(9), 90)], at(10), 3.6).at, at(13));
+  assert.equal(nextFeed([feed(at(9), 90)], at(10), 3.6, 120).at, at(14));
+  assert.equal(mlPerKgOf({}), 150);
+  assert.equal(mlPerKgOf(null), 150);
+  assert.equal(mlPerKgOf({ mlPerKg: 140 }), 140);
+  assert.equal(mlPerKgOf({ mlPerKg: 300 }), 150);
+  assert.equal(mlPerKgOf({ mlPerKg: 150.5 }), 150);
+  assert.equal(parseMlPerKg('150'), 150);
+  assert.equal(parseMlPerKg(' 100 '), 100);
+  assert.equal(parseMlPerKg('99'), null);
+  assert.equal(parseMlPerKg('201'), null);
+  assert.equal(parseMlPerKg('abc'), null);
+  assert.equal(parseMlPerKg('150.5'), null);
 });

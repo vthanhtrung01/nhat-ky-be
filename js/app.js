@@ -1,6 +1,6 @@
 import { firebaseConfig } from './firebase-config.js';
 import {
-  FEED_INTERVAL_MS, ML_PER_KG_DAY, addDays, ageInDays, ageLabel, cumulativeMl, currentSleep, dayStats, nextFeed, predictNextFeed, reminderLabel, eventsOfDay, formatDuration, milkOf, niceMax, parseLength, parseMl,
+  FEED_INTERVAL_MS, ML_PER_KG_DEFAULT, ML_PER_KG_MAX, ML_PER_KG_MIN, mlPerKgOf, parseMlPerKg, addDays, ageInDays, ageLabel, cumulativeMl, currentSleep, dayStats, nextFeed, predictNextFeed, reminderLabel, eventsOfDay, formatDuration, milkOf, niceMax, parseLength, parseMl,
   isoToVnDate, vnDateToIso, parseWeight, startOfDay, toDateInput, toLocalInput, vitaminD3Status, weekSeries,
 } from './stats.js';
 import {
@@ -109,6 +109,7 @@ const AFTER_TAG = {
 const who = (uid) => memberLabel(state.members, uid);
 const birthAt = () => state.profile.birthAt ?? Date.now();
 const babyName = () => state.profile.name || 'Bé';
+const mlPerKg = () => mlPerKgOf(state.profile);
 const isOwner = () => state.members.some((m) => m.uid === state.uid && m.role === 'owner');
 
 function babyLine() {
@@ -544,7 +545,7 @@ const PREDICT_BASIS = {
 };
 
 function predictLine(now) {
-  const p = predictNextFeed(state.recent, now, latestWeight(state.measurements, state.profile));
+  const p = predictNextFeed(state.recent, now, latestWeight(state.measurements, state.profile), mlPerKg());
   if (!p) return null;
   const range = p.from === p.to ? fmtTime(p.from) : `${fmtTime(p.from)}–${fmtTime(p.to)}`;
   return h('div', { class: 'predict' },
@@ -555,7 +556,7 @@ function predictLine(now) {
 function reminderCard() {
   const now = Date.now();
   const weightKg = latestWeight(state.measurements, state.profile);
-  const next = nextFeed(state.recent, now, weightKg);
+  const next = nextFeed(state.recent, now, weightKg, mlPerKg());
   if (!next) {
     return h('section', { class: 'card reminder' },
       h('div', { class: 'label' }, 'Cữ tiếp theo'),
@@ -570,7 +571,7 @@ function reminderCard() {
       h('span', { class: 'time' }, fmtTime(next.at)),
       h('span', { class: 'left' }, reminderLabel(next))),
     h('div', { class: 'last' }, next.basis === 'ml'
-      ? `${next.ml} ml ÷ ${Math.round(next.perHourMl * 10) / 10} ml/giờ (${weightKg} kg × ${ML_PER_KG_DAY} ml/ngày)`
+      ? `${next.ml} ml ÷ ${Math.round(next.perHourMl * 10) / 10} ml/giờ (${weightKg} kg × ${mlPerKg()} ml/kg/ngày)`
       : `Mặc định ${formatDuration(FEED_INTERVAL_MS / 60000)} (${weightKg ? 'cữ trước chưa có ml' : 'chưa có cân nặng'})`),
     predictLine(now),
     h('div', { class: 'last' }, `Cữ trước ${fmtTime(last.at)}, ${MILK_LABEL[milkOf(last)]} ${lastAmount}, ${who(last.by)}`));
@@ -867,14 +868,14 @@ function barChart({ title, unit, colorVar, days, valueOf, id }) {
 }
 
 // Sữa cộng dồn hôm nay theo giờ (0h–24h), so với đường mục tiêu tăng đều
-// từ 0 lúc 0h đến cân nặng × 140 ml lúc 24h.
+// từ 0 lúc 0h đến cân nặng × hệ số ml/kg/ngày lúc 24h.
 function cumulativeChart(now) {
   const W = 340;
   const H = 220;
   const pad = { l: 38, r: 34, t: 10, b: 26 };
   const cur = cumulativeMl(state.recent, startOfDay(now), now);
   const weightKg = latestWeight(state.measurements, state.profile);
-  const target = weightKg ? Math.round(weightKg * ML_PER_KG_DAY) : null;
+  const target = weightKg ? Math.round(weightKg * mlPerKg()) : null;
   const nowHour = cur.points.at(-1)[0];
 
   const peak = Math.max(target ?? 0, cur.total, 1);
@@ -919,7 +920,48 @@ function cumulativeChart(now) {
       svg('circle', { class: 'c-now', cx: x(nowHour), cy: y(cur.total), r: 4.5 })),
     h('div', { class: 'c-legend' },
       h('span', {}, h('i', { class: 'today' }), 'Đã bú'),
-      target ? h('span', {}, h('i', { class: 'pace' }), `Mục tiêu ${weightKg} kg × ${ML_PER_KG_DAY} ml`) : null));
+      target ? h('span', {}, h('i', { class: 'pace' }), `Mục tiêu ${weightKg} kg × ${mlPerKg()} ml/kg`) : null,
+      h('button', { class: 'link', type: 'button', onclick: openMlPerKgEditor, 'aria-label': 'Sửa hệ số sữa mục tiêu' },
+        target ? '✎ Sửa hệ số' : `Hệ số ${mlPerKg()} ml/kg/ngày ✎`)));
+}
+
+// Hệ số sữa mục tiêu ml/kg/ngày, mọi thành viên sửa được.
+function openMlPerKgEditor() {
+  const current = mlPerKg();
+  const input = h('input', {
+    type: 'number', inputMode: 'numeric', min: ML_PER_KG_MIN, max: ML_PER_KG_MAX, step: 5, value: current, 'aria-label': 'ml/kg/ngày',
+  });
+  const save = (v) => {
+    state.store.updateProfile({ mlPerKg: v, updatedAt: Date.now(), by: state.uid });
+    closeDialog();
+    toast(`Đã đổi mục tiêu thành ${v} ml/kg/ngày`);
+  };
+  openDialog(
+    h('h1', {}, 'Sữa mục tiêu mỗi ngày'),
+    h('p', { class: 'muted' }, `Mục tiêu = cân nặng × hệ số. Đề xuất ${ML_PER_KG_DEFAULT} ml/kg/ngày cho bé 0–6 tháng. Nếu bác sĩ dặn khác, hãy theo bác sĩ.`),
+    h('div', { class: 'chips' }, [120, 140, 150, 160, 180].map((v) => h('button', {
+      class: 'chip', type: 'button', 'aria-pressed': String(v === current), onclick: () => save(v),
+    }, `${v}`))),
+    h('form', {
+      class: 'inline mt',
+      onsubmit: (ev) => {
+        ev.preventDefault();
+        const v = parseMlPerKg(input.value);
+        if (v == null) toast(`Nhập số từ ${ML_PER_KG_MIN} đến ${ML_PER_KG_MAX}`);
+        else save(v);
+      },
+    }, input, h('button', { class: 'btn primary', type: 'submit' }, 'Lưu')),
+    h('div', { class: 'row-btns mt' },
+      h('button', { class: 'btn', type: 'button', onclick: closeDialog }, 'Đóng'),
+      current === ML_PER_KG_DEFAULT ? null
+        : h('button', { class: 'btn', type: 'button', onclick: () => save(ML_PER_KG_DEFAULT) }, `Dùng đề xuất ${ML_PER_KG_DEFAULT}`)),
+  );
+}
+
+function mlPerKgRow() {
+  return h('div', { class: 'row-btns mt' },
+    h('span', {}, `🍼 Sữa mục tiêu: ${mlPerKg()} ml/kg/ngày`),
+    h('button', { class: 'btn', type: 'button', onclick: openMlPerKgEditor }, '✎ Sửa'));
 }
 
 function renderCharts() {
@@ -1663,7 +1705,8 @@ function babySettings() {
     return h('section', { class: 'card' },
       h('h2', { style: 'margin-top:0' }, '👶 Hồ sơ bé'),
       h('p', {}, `${p.name ?? 'Bé'} · ${SEX[p.sex] ?? ''} · sinh ${p.birthAt ? fmtDay(p.birthAt) : '?'}`),
-      h('p', { class: 'small muted' }, 'Chỉ chủ nhật ký sửa được hồ sơ bé.'));
+      h('p', { class: 'small muted' }, 'Chỉ chủ nhật ký sửa được tên, ngày sinh và giới tính của bé.'),
+      mlPerKgRow());
   }
   const fields = profileFields(p);
   return h('section', { class: 'card' },
@@ -1677,7 +1720,8 @@ function babySettings() {
         state.store.updateProfile({ ...v, updatedAt: Date.now(), by: state.uid });
         toast('Đã lưu hồ sơ bé');
       },
-    }, fields.nodes, h('button', { class: 'btn primary block', type: 'submit' }, 'Lưu hồ sơ bé')));
+    }, fields.nodes, h('button', { class: 'btn primary block', type: 'submit' }, 'Lưu hồ sơ bé')),
+    mlPerKgRow());
 }
 
 async function act(promise, done) {
